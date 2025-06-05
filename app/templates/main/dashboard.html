@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - FormMate AI{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h1 class="text-2xl font-semibold text-gray-900">Dashboard</h1>
+    </div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+        <!-- Form Processing Section -->
+        <div class="py-4">
+            <div class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-lg font-medium text-gray-900 mb-4">Process New Form</h2>
+                <form id="processForm" class="space-y-4">
+                    <div>
+                        <label for="formUrl" class="block text-sm font-medium text-gray-700">Google Form URL</label>
+                        <div class="mt-1">
+                            <input type="url" name="formUrl" id="formUrl"
+                                class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                placeholder="https://docs.google.com/forms/d/e/...">
+                        </div>
+                    </div>
+                    <div>
+                        <button type="submit"
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            Process Form
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Q&A Bank Section -->
+        <div class="py-4">
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-medium text-gray-900">Your Q&A Bank</h2>
+                    <button type="button" onclick="showAddQAModal()"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Add New Q&A
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    {% for qa in qa_pairs %}
+                    <div class="border rounded-lg p-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="text-sm font-medium text-gray-900">{{ qa.question }}</h3>
+                                <p class="mt-1 text-sm text-gray-500">{{ qa.answer }}</p>
+                            </div>
+                            <button type="button" onclick="deleteQA({{ qa.id }})"
+                                class="text-red-600 hover:text-red-900">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Submissions Section -->
+        <div class="py-4">
+            <div class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-lg font-medium text-gray-900 mb-4">Recent Submissions</h2>
+                <div class="space-y-4">
+                    {% for submission in recent_submissions %}
+                    <div class="border rounded-lg p-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="text-sm font-medium text-gray-900">{{ submission.form_url }}</h3>
+                                <p class="mt-1 text-sm text-gray-500">Submitted on {{ submission.submitted_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                            </div>
+                            <a href="{{ submission.form_url }}" target="_blank"
+                                class="text-indigo-600 hover:text-indigo-900">
+                                View Form
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Q&A Modal -->
+<div id="addQAModal" class="hidden fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+            <div>
+                <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Add New Q&A</h3>
+                <div class="mt-4">
+                    <form id="addQAForm" class="space-y-4">
+                        <div>
+                            <label for="question" class="block text-sm font-medium text-gray-700">Question</label>
+                            <input type="text" name="question" id="question"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="answer" class="block text-sm font-medium text-gray-700">Answer</label>
+                            <textarea name="answer" id="answer" rows="3"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                <button type="button" onclick="submitQA()"
+                    class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm">
+                    Add
+                </button>
+                <button type="button" onclick="hideAddQAModal()"
+                    class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function showAddQAModal() {
+        document.getElementById('addQAModal').classList.remove('hidden');
+    }
+
+    function hideAddQAModal() {
+        document.getElementById('addQAModal').classList.add('hidden');
+    }
+
+    function submitQA() {
+        const question = document.getElementById('question').value;
+        const answer = document.getElementById('answer').value;
+
+        fetch('/save-qa', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ question, answer }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            }
+        });
+    }
+
+    function deleteQA(id) {
+        if (confirm('Are you sure you want to delete this Q&A pair?')) {
+            fetch(`/delete-qa/${id}`, {
+                method: 'DELETE',
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                }
+            });
+        }
+    }
+
+    document.getElementById('processForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formUrl = document.getElementById('formUrl').value;
+
+        fetch('/process-form', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ form_url: formUrl }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Handle successful form processing
+                console.log(data);
+            } else {
+                alert(data.error);
+            }
+        });
+    });
+</script>
+{% endblock %} 
