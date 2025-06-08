@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "FormMate AI",
+  "version": "1.0.0",
+  "description": "Your Smart Assistant to Fill, Manage & Remember Forms",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*.google.com/*",
+    "http://localhost:5000/*"
+  ],
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_icon": {
+      "16": "src/assets/icon16.png",
+      "48": "src/assets/icon48.png",
+      "128": "src/assets/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "src/assets/icon16.png",
+    "48": "src/assets/icon48.png",
+    "128": "src/assets/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.google.com/forms/*"],
+      "js": ["src/content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  }
+} 

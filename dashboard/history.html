@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submission History - FormMate AI</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="dashboard">
+        <nav class="sidebar">
+            <div class="logo">
+                <h1>FormMate AI</h1>
+            </div>
+            <ul>
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="qa.html">Q&A Manager</a></li>
+                <li><a href="form_processor.html">Form Processor</a></li>
+                <li class="active"><a href="history.html">Submission History</a></li>
+                <li><button id="logoutBtn" class="btn-logout">Logout</button></li>
+            </ul>
+        </nav>
+
+        <main class="main-content">
+            <h1>Submission History</h1>
+            <p>Track your form submissions and AI responses</p>
+
+            <div class="history-container">
+                <div class="search-bar">
+                    <input type="text" id="searchInput" placeholder="Search submissions...">
+                </div>
+
+                <div id="submissionList" class="submission-list">
+                    <!-- Submissions will be loaded here -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module" src="js/config.js"></script>
+    <script type="module" src="js/firebase.js"></script>
+    <script type="module" src="js/history.js"></script>
+</body>
+</html> 

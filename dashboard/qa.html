@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q&A Manager - FormMate AI</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div class="dashboard">
+        <nav class="sidebar">
+            <div class="logo">
+                <h1>FormMate AI</h1>
+            </div>
+            <ul>
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li class="active"><a href="qa.html">Q&A Manager</a></li>
+                <li><a href="form_processor.html">Form Processor</a></li>
+                <li><a href="history.html">Submission History</a></li>
+                <li><button id="logoutBtn" class="btn-logout">Logout</button></li>
+            </ul>
+        </nav>
+
+        <main class="main-content">
+            <h1>Q&A Manager</h1>
+            <p>Manage your Q&A pairs for AI form processing</p>
+
+            <div class="qa-container">
+                <form id="qaForm" class="qa-form">
+                    <div class="form-group">
+                        <label for="question">Question:</label>
+                        <input type="text" id="question" required placeholder="Enter a question">
+                    </div>
+                    <div class="form-group">
+                        <label for="answer">Answer:</label>
+                        <textarea id="answer" required placeholder="Enter the answer"></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">Add Q&A</button>
+                </form>
+
+                <div id="qaList" class="qa-list">
+                    <!-- Q&A pairs will be loaded here -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/firebase.js"></script>
+    <script src="js/qa.js"></script>
+</body>
+</html> 
