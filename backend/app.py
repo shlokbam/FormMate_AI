@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
@@ -25,7 +25,7 @@ print("FIREBASE_CLIENT_CERT_URL:", os.getenv('FIREBASE_CLIENT_CERT_URL'))
 print("GEMINI_API_KEY:", "Present" if os.getenv('GEMINI_API_KEY') else "Missing")
 print("\n")
 
-app = Flask(__name__, static_folder='../dashboard')
+app = Flask(__name__)
 CORS(app)
 
 # JWT Configuration
@@ -398,28 +398,6 @@ def process_form(current_user):
     except Exception as e:
         print(f"Error processing form: {str(e)}")
         return jsonify({'error': str(e)}), 500
-
-# Serve dashboard files
-@app.route('/')
-def serve_dashboard():
-    return send_from_directory(app.static_folder, 'index.html')
-
-@app.route('/<path:path>')
-def serve_static(path):
-    return send_from_directory(app.static_folder, path)
-
-# Serve frontend configuration
-@app.route('/api/config')
-def get_config():
-    config = {
-        'FIREBASE_API_KEY': os.getenv('FIREBASE_API_KEY'),
-        'FIREBASE_AUTH_DOMAIN': os.getenv('FIREBASE_AUTH_DOMAIN'),
-        'FIREBASE_PROJECT_ID': os.getenv('FIREBASE_PROJECT_ID'),
-        'FIREBASE_STORAGE_BUCKET': os.getenv('FIREBASE_STORAGE_BUCKET'),
-        'FIREBASE_MESSAGING_SENDER_ID': os.getenv('FIREBASE_MESSAGING_SENDER_ID'),
-        'FIREBASE_APP_ID': os.getenv('FIREBASE_APP_ID')
-    }
-    return jsonify(config)
 
 if __name__ == '__main__':
     app.run(debug=True) 
