@@ -12,10 +12,6 @@ function extractQuestions() {
         
         let question = questionElement.textContent.trim();
         
-        // Get the input element
-        const inputElement = item.querySelector('input, textarea, select');
-        if (!inputElement) return;
-        
         // Clean up the question text
         question = question.replace(/[•*]/g, '').trim();
         
@@ -24,14 +20,59 @@ function extractQuestions() {
         
         // Remove any question number prefix (e.g., "1. ")
         question = question.replace(/^\d+\.\s*/, '').trim();
-        
-        if (question) {
-            console.log(`Extracted question: "${question}" for element:`, inputElement);
+
+        // Check for radio group
+        const radioInputs = item.querySelectorAll('input[type="radio"]');
+        if (radioInputs.length > 0) {
+            // Extract all radio options and their labels
+            const options = [];
+            radioInputs.forEach(radio => {
+                let label = '';
+                // Try to find the label text for this radio input
+                // Google Forms: label is usually in a sibling span or div
+                let labelSpan = null;
+                let parent = radio.parentElement;
+                // Traverse up to 2 levels up to find a span with text
+                for (let i = 0; i < 2 && parent; i++) {
+                    labelSpan = parent.querySelector('span');
+                    if (labelSpan && labelSpan.textContent.trim()) {
+                        label = labelSpan.textContent.trim();
+                        break;
+                    }
+                    parent = parent.parentElement;
+                }
+                // Fallback: try next sibling
+                if (!label && radio.nextElementSibling) {
+                    label = radio.nextElementSibling.textContent.trim();
+                }
+                // Fallback: try parent text content
+                if (!label && radio.parentElement) {
+                    label = radio.parentElement.textContent.trim();
+                }
+                options.push({
+                    value: radio.value,
+                    label: label,
+                    element: radio
+                });
+            });
+            console.log(`Extracted radio options for question: "${question}"`, options.map(o => o.label));
             questions.push({
                 question: question,
-                element: inputElement
+                type: 'radio',
+                options: options
             });
+            return;
         }
+
+        // Get the input element
+        const inputElement = item.querySelector('input, textarea, select');
+        if (!inputElement) return;
+        
+        questions.push({
+            question: question,
+            type: inputElement.type || inputElement.tagName,
+            element: inputElement
+        });
     });
     
     console.log('All extracted questions:', questions);
@@ -87,41 +128,65 @@ async function fillFormFields(answers) {
         
         if (matchingQuestion) {
             try {
-                const element = matchingQuestion.element;
-                console.log(`Filling field "${matchingQuestion.question}" with answer: "${answer.answer}"`);
-                
-                // Handle different input types
-                switch (element.type) {
-                    case 'checkbox':
-                        element.checked = answer.answer.toLowerCase() === 'yes' || 
-                                        answer.answer.toLowerCase() === 'true';
-                        break;
-                        
-                    case 'radio':
-                        const radioInputs = document.querySelectorAll(`input[name="${element.name}"]`);
-                        radioInputs.forEach(radio => {
-                            radio.checked = radio.value.toLowerCase() === answer.answer.toLowerCase();
-                        });
-                        break;
-                        
-                    case 'select-one':
-                        const options = Array.from(element.options);
-                        const matchingOption = options.find(opt => 
-                            opt.text.toLowerCase() === answer.answer.toLowerCase()
+                if (matchingQuestion.type === 'radio' && matchingQuestion.options) {
+                    // Match answer to label (case-insensitive, trimmed)
+                    const match = matchingQuestion.options.find(opt =>
+                        opt.label && opt.label.toLowerCase().trim() === answer.answer.toLowerCase().trim()
+                    );
+                    if (match) {
+                        match.element.checked = true;
+                        match.element.dispatchEvent(new Event('change', { bubbles: true }));
+                        filledCount++;
+                        console.log(`Selected radio option: ${match.label}`);
+                        continue;
+                    } else {
+                        // Try partial match if exact match fails
+                        const partial = matchingQuestion.options.find(opt =>
+                            opt.label && opt.label.toLowerCase().includes(answer.answer.toLowerCase())
                         );
-                        if (matchingOption) {
-                            element.value = matchingOption.value;
+                        if (partial) {
+                            partial.element.checked = true;
+                            partial.element.dispatchEvent(new Event('change', { bubbles: true }));
+                            filledCount++;
+                            console.log(`Selected radio option (partial match): ${partial.label}`);
+                            continue;
                         }
-                        break;
-                        
-                    default:
-                        // For Google Forms, we need to trigger the input event
-                        element.value = answer.answer;
-                        element.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    errorCount++;
+                    console.warn(`No matching radio option found for answer: ${answer.answer}`);
+                }
+                else if (matchingQuestion.type === 'checkbox') {
+                    const element = matchingQuestion.element;
+                    const shouldCheck = ['yes', 'true', '1'].includes(answer.answer.toLowerCase());
+                    element.checked = shouldCheck;
+                    element.dispatchEvent(new Event('change', { bubbles: true }));
+                    filledCount++;
+                }
+                else if (matchingQuestion.type === 'select-one' || matchingQuestion.type === 'SELECT') {
+                    const element = matchingQuestion.element;
+        const options = Array.from(element.options);
+                    const matchingOption = options.find(opt => 
+                        opt.text.toLowerCase() === answer.answer.toLowerCase() ||
+                        opt.value.toLowerCase() === answer.answer.toLowerCase()
+        );
+        if (matchingOption) {
+            element.value = matchingOption.value;
                         element.dispatchEvent(new Event('change', { bubbles: true }));
+                        filledCount++;
+                    } else {
+                        errorCount++;
+                        console.warn(`No matching select option found for answer: ${answer.answer}`);
+                    }
+                }
+                else {
+                    // For text inputs, textareas, and other input types
+                    const element = matchingQuestion.element;
+                    element.value = answer.answer;
+                    element.dispatchEvent(new Event('input', { bubbles: true }));
+                    element.dispatchEvent(new Event('change', { bubbles: true }));
+                    filledCount++;
                 }
                 
-                filledCount++;
                 console.log(`Successfully filled field: "${matchingQuestion.question}"`);
                 
             } catch (error) {
@@ -169,15 +234,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 
                 // Send questions to backend
                 const backendResponse = await fetch('http://localhost:5000/api/process-form', {
-                    method: 'POST',
-                    headers: {
+            method: 'POST',
+            headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${response.token}`
-                    },
-                    body: JSON.stringify({
+            },
+            body: JSON.stringify({
                         questions: questions.map(q => ({ question: q.question }))
-                    })
-                });
+            })
+        });
                 
                 if (!backendResponse.ok) {
                     const errorData = await backendResponse.json();
@@ -196,7 +261,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     result: result
                 });
                 
-            } catch (error) {
+    } catch (error) {
                 console.error('Error filling form:', error);
                 sendResponse({
                     success: false,
