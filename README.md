@@ -1,108 +1,142 @@
-# FormMate AI 🤖
+# FormMate AI - Chrome Extension
 
-Your Smart Assistant to Fill, Manage & Remember Forms — Like a Real Teammate.
-
-## Overview
-
-FormMate AI is an intelligent form-filling assistant that helps you automate the process of filling out Google Forms. It combines a personal knowledge base with AI-powered smart answers to make form filling effortless and accurate.
+FormMate AI is a Chrome extension that helps you automatically fill out Google Forms using your personal knowledge base. It uses AI to match form questions with your stored answers and provides a user-friendly interface to manage your Q&A pairs.
 
 ## Features
 
-- 🧩 **Chrome Extension**
-  - Automatically detects and activates on Google Forms
-  - Parses form questions and field IDs
-  - Smart autofill functionality
-  - Optional preview before submission
-
-- 🌐 **Web Dashboard**
-  - User authentication with Firebase
-  - Personal knowledge bank management
-  - Form submission history
-  - Answer preview functionality
-
-- 🤖 **AI Integration**
-  - Smart answer generation for unknown questions
-  - Context-aware responses
-  - Customizable AI behavior
-
-## Tech Stack
-
-- **Frontend**: HTML, CSS, JavaScript
-- **Backend**: Flask (Python)
-- **Database**: Firebase Firestore
-- **Authentication**: Firebase Auth
-- **AI Engine**: OpenAI GPT API
-- **Extension**: Chrome Extension API
-- **Hosting**: Vercel/Netlify (Frontend), Render/Railway (Backend)
+- **Automatic Form Filling**: Automatically fills Google Forms using your stored Q&A pairs
+- **Smart Question Matching**: Uses advanced text matching to find the best answers for form questions
+- **Q&A Management**: Easy-to-use interface to add, edit, and delete your Q&A pairs
+- **Secure Authentication**: Firebase Authentication for secure user management
+- **Profile Management**: Change password and manage your account settings
 
 ## Project Structure
 
 ```
-formmate-ai/
-├── extension/           # Chrome extension files
-├── backend/            # Flask backend
-├── dashboard/          # Web dashboard
-└── docs/              # Documentation
+FormMate_AI/
+├── backend/
+│   ├── app.py           # Main backend application with all routes
+│   ├── requirements.txt # Python dependencies
+│   └── .env            # Environment variables
+├── extension/
+│   ├── manifest.json   # Extension configuration
+│   ├── popup.html      # Extension popup UI
+│   ├── popup.js        # Extension popup logic
+│   ├── content.js      # Form filling logic
+│   ├── background.js   # Background tasks
+│   └── icons/          # Extension icons
+└── README.md           # Project documentation
 ```
 
-## Getting Started
+## Setup Instructions
 
-### Prerequisites
+### Backend Setup
 
-- Python 3.8+
-- Node.js 14+
-- Chrome browser
-- Firebase account
-- OpenAI API key
-
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/shlokbam/formmate-ai.git
-   cd formmate-ai
-   ```
-
-2. Set up the backend:
+1. Navigate to the backend directory:
    ```bash
    cd backend
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+2. Create a virtual environment and activate it:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   ```
+
+3. Install dependencies:
+   ```bash
    pip install -r requirements.txt
    ```
 
-3. Set up the dashboard:
-   ```bash
-   cd dashboard
-   npm install
+4. Create a `.env` file with the following variables:
+   ```
+   FIREBASE_PROJECT_ID=your_project_id
+   FIREBASE_PRIVATE_KEY_ID=your_private_key_id
+   FIREBASE_PRIVATE_KEY=your_private_key
+   FIREBASE_CLIENT_EMAIL=your_client_email
+   FIREBASE_CLIENT_ID=your_client_id
+   FIREBASE_CLIENT_CERT_URL=your_client_cert_url
+   GEMINI_API_KEY=your_gemini_api_key
+   JWT_SECRET=your_jwt_secret
    ```
 
-4. Load the Chrome extension:
-   - Open Chrome and go to `chrome://extensions/`
-   - Enable "Developer mode"
-   - Click "Load unpacked" and select the `extension` directory
+5. Start the backend server:
+   ```bash
+   python app.py
+   ```
 
-### Environment Variables
+### Extension Setup
 
-Create a `.env` file in the backend directory with:
+1. Open Chrome and go to `chrome://extensions/`
+2. Enable "Developer mode" in the top right
+3. Click "Load unpacked" and select the `extension` directory
+4. The FormMate AI extension should now be installed
 
-```
-OPENAI_API_KEY=your_api_key
-FIREBASE_CONFIG=your_firebase_config
-```
+## Usage
+
+1. **Login/Register**:
+   - Click the extension icon
+   - Create an account or log in with existing credentials
+
+2. **Manage Q&A Pairs**:
+   - Go to the "Q&A Manager" tab
+   - Add new Q&A pairs using the form
+   - Edit or delete existing pairs
+   - Search through your Q&A pairs
+
+3. **Fill Forms**:
+   - Navigate to any Google Form
+   - Click the extension icon
+   - Click "Fill Form" to automatically fill the form using your stored answers
+
+## API Endpoints
+
+### Authentication
+- `POST /api/register` - Register a new user
+- `POST /api/login` - Login user
+- `GET /api/validate-token` - Validate JWT token
+
+### Q&A Management
+- `GET /api/qa` - Get all Q&A items
+- `POST /api/qa` - Add new Q&A item
+- `PUT /api/qa/<qa_id>` - Update Q&A item
+- `DELETE /api/qa/<qa_id>` - Delete Q&A item
+
+### Form Processing
+- `POST /api/process-form` - Process form questions and return answers
+
+### Profile Management
+- `POST /api/change-password` - Change user password
+
+## Technologies Used
+
+- **Frontend**:
+  - HTML/CSS/JavaScript
+  - Chrome Extension APIs
+  - Firebase Authentication
+
+- **Backend**:
+  - Python/Flask
+  - Firebase Admin SDK
+  - JWT Authentication
+  - Google Gemini AI
+
+## Security Features
+
+- JWT-based authentication
+- Secure password storage with Firebase Auth
+- CORS protection
+- Environment variable configuration
+- Token validation middleware
 
 ## Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Contact
-
-Project Link: [https://github.com/yourusername/formmate-ai](https://github.com/yourusername/formmate-ai) 
+This project is licensed under the MIT License - see the LICENSE file for details. 

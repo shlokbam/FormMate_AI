@@ -6,7 +6,6 @@ const registerForm = document.getElementById('register-form');
 const userEmail = document.getElementById('user-email');
 const status = document.getElementById('status');
 const fillFormBtn = document.getElementById('fillForm');
-const saveFormBtn = document.getElementById('saveForm');
 const loading = document.getElementById('loading');
 
 // Auth Elements
@@ -24,7 +23,8 @@ const addQaBtn = document.getElementById('add-qa-btn');
 const qaList = document.getElementById('qa-list');
 
 // Profile Elements
-const changePassword = document.getElementById('change-password');
+const newPassword = document.getElementById('new-password');
+const confirmPassword = document.getElementById('confirm-password');
 const updatePasswordBtn = document.getElementById('update-password-btn');
 const logoutBtn = document.getElementById('logout-btn');
 
@@ -93,6 +93,19 @@ document.getElementById('show-login').addEventListener('click', (e) => {
     loginForm.style.display = 'block';
 });
 
+// Helper Functions
+function showToast(message, type = 'error') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    // Remove toast after 3 seconds
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
+
 // Login Handler
 document.getElementById('login-btn').addEventListener('click', async () => {
     try {
@@ -100,10 +113,9 @@ document.getElementById('login-btn').addEventListener('click', async () => {
         const email = loginEmail.value;
         const password = loginPassword.value;
         
-        console.log('Attempting login with email:', email);
-        
         if (!email || !password) {
-            throw new Error('Please fill in all fields');
+            showToast('Please fill in all fields');
+            return;
         }
 
         const response = await fetch('http://localhost:5000/api/login', {
@@ -118,16 +130,16 @@ document.getElementById('login-btn').addEventListener('click', async () => {
         const data = await response.json();
         
         if (!response.ok) {
-            console.error('Login failed:', data);
-            throw new Error(data.error || 'Invalid credentials');
+            showToast(data.error || 'Invalid credentials');
+            return;
         }
 
-        console.log('Login successful, storing token...');
         await storeToken(data.token);
         showMainSection(data.user);
+        showToast('Login successful!', 'success');
     } catch (error) {
         console.error('Login error:', error);
-        alert(error.message);
+        showToast('Failed to connect to server. Please try again.');
     } finally {
         hideLoading();
     }
@@ -142,15 +154,18 @@ document.getElementById('register-btn').addEventListener('click', async () => {
         const confirmPassword = registerConfirmPassword.value;
         
         if (!email || !password || !confirmPassword) {
-            throw new Error('Please fill in all fields');
+            showToast('Please fill in all fields');
+            return;
         }
 
         if (password !== confirmPassword) {
-            throw new Error('Passwords do not match');
+            showToast('Passwords do not match');
+            return;
         }
 
         if (!termsCheckbox.checked) {
-            throw new Error('Please accept the terms and conditions');
+            showToast('Please accept the terms and conditions');
+            return;
         }
 
         const response = await fetch('http://localhost:5000/api/register', {
@@ -163,14 +178,16 @@ document.getElementById('register-btn').addEventListener('click', async () => {
 
         if (!response.ok) {
             if (data.error === 'Email already exists') {
-                throw new Error('This email is already registered. Please try logging in instead.');
+                showToast('This email is already registered. Please try logging in instead.');
             } else {
-                throw new Error(data.error || 'Registration failed. Please try again.');
+                showToast(data.error || 'Registration failed. Please try again.');
             }
+            return;
         }
 
         await storeToken(data.token);
         showMainSection(data.user);
+        showToast('Registration successful!', 'success');
         
         // Clear form fields
         registerEmail.value = '';
@@ -180,7 +197,7 @@ document.getElementById('register-btn').addEventListener('click', async () => {
         
     } catch (error) {
         console.error('Registration error:', error);
-        alert(error.message);
+        showToast('Failed to connect to server. Please try again.');
     } finally {
         hideLoading();
     }
@@ -426,10 +443,17 @@ qaSearch.addEventListener('input', (e) => {
 updatePasswordBtn.addEventListener('click', async () => {
     try {
         showLoading();
-        const newPassword = changePassword.value;
+        const password = newPassword.value;
+        const confirm = confirmPassword.value;
         
-        if (!newPassword) {
-            throw new Error('Please enter a new password');
+        if (!password || !confirm) {
+            showToast('Please fill in all fields');
+            return;
+        }
+
+        if (password !== confirm) {
+            showToast('Passwords do not match');
+            return;
         }
 
         const response = await fetch('http://localhost:5000/api/change-password', {
@@ -438,17 +462,21 @@ updatePasswordBtn.addEventListener('click', async () => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${await getStoredToken()}`
             },
-            body: JSON.stringify({ password: newPassword })
+            body: JSON.stringify({ password })
         });
 
         if (!response.ok) {
-            throw new Error('Failed to update password');
+            const data = await response.json();
+            showToast(data.error || 'Failed to update password');
+            return;
         }
 
-        alert('Password updated successfully');
-        changePassword.value = '';
+        showToast('Password updated successfully!', 'success');
+        newPassword.value = '';
+        confirmPassword.value = '';
     } catch (error) {
-        alert(error.message);
+        console.error('Password update error:', error);
+        showToast('Failed to connect to server. Please try again.');
     } finally {
         hideLoading();
     }
@@ -464,18 +492,15 @@ async function checkForm() {
             status.textContent = `Form ready (${response.fieldCount} fields)`;
             status.className = 'status ready';
             fillFormBtn.disabled = false;
-            saveFormBtn.disabled = false;
         } else {
             status.textContent = response.error || 'No form found';
             status.className = 'status error';
             fillFormBtn.disabled = true;
-            saveFormBtn.disabled = true;
         }
     } catch (error) {
         status.textContent = 'Error checking form';
         status.className = 'status error';
         fillFormBtn.disabled = true;
-        saveFormBtn.disabled = true;
     }
 }
 

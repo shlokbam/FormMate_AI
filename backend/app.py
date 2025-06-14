@@ -10,6 +10,7 @@ import json
 import re
 import jwt
 from functools import wraps
+import requests
 
 # Load environment variables
 load_dotenv()
@@ -184,9 +185,18 @@ def login():
             user = auth.get_user_by_email(email)
             print(f"User found in Firebase: {user.uid}")
             
-            # Verify password using custom token
-            custom_token = auth.create_custom_token(user.uid)
-            print("Custom token created successfully")
+            # Sign in with email and password to verify credentials
+            sign_in_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={os.getenv('FIREBASE_API_KEY')}"
+            sign_in_data = {
+                "email": email,
+                "password": password,
+                "returnSecureToken": True
+            }
+            
+            response = requests.post(sign_in_url, json=sign_in_data)
+            if not response.ok:
+                print(f"Firebase sign in failed: {response.text}")
+                return jsonify({'error': 'Invalid credentials'}), 401
             
             # Generate JWT token
             token = jwt.encode({
@@ -322,15 +332,32 @@ def change_password(current_user):
         if not new_password:
             return jsonify({'error': 'New password is required'}), 400
         
+        print(f"Updating password for user: {current_user.id}")
+        
         # Update password in Firebase Auth
-        auth_client.update_user(
+        auth.update_user(
             current_user.id,
             password=new_password
         )
         
+        # Verify the password was updated by attempting to sign in
+        sign_in_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={os.getenv('FIREBASE_API_KEY')}"
+        sign_in_data = {
+            "email": current_user.get('email'),
+            "password": new_password,
+            "returnSecureToken": True
+        }
+        
+        response = requests.post(sign_in_url, json=sign_in_data)
+        if not response.ok:
+            print(f"Password verification failed: {response.text}")
+            return jsonify({'error': 'Failed to verify password update'}), 500
+        
+        print("Password updated and verified successfully")
         return jsonify({'message': 'Password updated successfully'})
         
     except Exception as e:
+        print(f"Error updating password: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 # Form Processing endpoint
