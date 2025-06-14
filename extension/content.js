@@ -1,253 +1,210 @@
-// Listen for messages from the popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'checkForm') {
-        const form = document.querySelector('form');
-        if (!form) {
-            sendResponse({ ready: false, error: 'No form found on this page' });
-        } else {
-            // Count input fields
-            const inputs = form.querySelectorAll('input, textarea, select');
-            sendResponse({ ready: inputs.length > 0, fieldCount: inputs.length, error: inputs.length === 0 ? 'No form fields found' : undefined });
-        }
-    } else if (request.action === 'fillForm') {
-        handleFormFill().then(sendResponse);
-        return true; // Required for async response
-    }
-});
-
-// Main form filling function
-async function handleFormFill() {
-    try {
-        const form = document.querySelector('form');
-        if (!form) {
-            return { success: false, error: 'No form found on this page' };
-        }
-
-        console.log('Form found:', form); // Debug log
-
-        // Try different selectors for Google Forms questions
-        const formItems = form.querySelectorAll([
-            '.freebirdFormviewerViewItemsItemItem', // Standard form items
-            '.freebirdFormviewerViewItemsItem',     // Alternative class
-            '[role="listitem"]',                    // Role-based selector
-            '.freebirdFormviewerViewItemsItemItemTitle', // Direct question title
-            '.freebirdFormviewerViewItemsItemItemHeader' // Question header
-        ].join(','));
-
-        console.log('Found form items:', formItems.length); // Debug log
-
-        const questions = [];
-        const inputMap = [];
-
-        // Extract questions from Google Forms structure
-        formItems.forEach(item => {
-            console.log('Processing item:', item); // Debug log
-
-            // Try different selectors for question text
-            const questionElement = item.querySelector([
-                '.freebirdFormviewerViewItemsItemItemTitle',
-                '.freebirdFormviewerViewItemsItemItemHeader',
-                '[role="heading"]',
-                '.freebirdFormviewerViewItemsItemItemTitleContainer'
-            ].join(','));
-
-            if (!questionElement) {
-                console.log('No question element found in item:', item);
-                return;
-            }
-
-            const question = questionElement.textContent.trim();
-            if (!question) {
-                console.log('Empty question text found');
-                return;
-            }
-
-            console.log('Found question:', question); // Debug log
-
-            // Get the input element - try different selectors
-            const input = item.querySelector([
-                'input:not([type="hidden"])',
-                'textarea',
-                'select',
-                '[role="textbox"]',
-                '[role="combobox"]',
-                '[role="listbox"]'
-            ].join(','));
-
-            if (!input) {
-                console.log('No input element found for question:', question);
-                return;
-            }
-
-            console.log('Found input element:', input); // Debug log
-
-            questions.push({ question: question });
-            inputMap.push({ element: input, question: question });
-        });
-
-        if (questions.length === 0) {
-            // If no questions found, try alternative approach
-            const allTextElements = form.querySelectorAll('div[role="heading"], .freebirdFormviewerViewItemsItemItemTitle');
-            console.log('Trying alternative approach, found elements:', allTextElements.length);
-
-            allTextElements.forEach(element => {
-                const question = element.textContent.trim();
-                if (question) {
-                    // Find the next input element
-                    let nextElement = element.nextElementSibling;
-                    while (nextElement && !nextElement.matches('input, textarea, select')) {
-                        nextElement = nextElement.nextElementSibling;
-                    }
-
-                    if (nextElement) {
-                        console.log('Found question (alternative):', question);
-                        questions.push({ question: question });
-                        inputMap.push({ element: nextElement, question: question });
-                    }
-                }
+// Function to extract questions from the page
+function extractQuestions() {
+    const questions = [];
+    
+    // Google Forms specific selectors
+    const formElements = document.querySelectorAll('form div[role="listitem"]');
+    
+    formElements.forEach(item => {
+        // Get the question text
+        const questionElement = item.querySelector('div[role="heading"]');
+        if (!questionElement) return;
+        
+        let question = questionElement.textContent.trim();
+        
+        // Get the input element
+        const inputElement = item.querySelector('input, textarea, select');
+        if (!inputElement) return;
+        
+        // Clean up the question text
+        question = question.replace(/[•*]/g, '').trim();
+        
+        // Remove any asterisk indicating required field
+        question = question.replace(/\*$/, '').trim();
+        
+        // Remove any question number prefix (e.g., "1. ")
+        question = question.replace(/^\d+\.\s*/, '').trim();
+        
+        if (question) {
+            console.log(`Extracted question: "${question}" for element:`, inputElement);
+            questions.push({
+                question: question,
+                element: inputElement
             });
         }
-
-        if (questions.length === 0) {
-            return { success: false, error: 'No questions found in the form' };
-        }
-
-        console.log('Questions to be sent:', questions); // Debug log
-
-        // Get UID from Chrome storage
-        const uid = await getUID();
-        if (!uid) {
-            return { success: false, error: 'No UID found. Please save your UID in the extension popup.' };
-        }
-
-        // Fetch answers from backend
-        const answers = await fetchAnswersFromBackend(uid, questions);
-        if (!answers || !Array.isArray(answers)) {
-            return { success: false, error: 'No answers returned from backend.' };
-        }
-
-        console.log('Received answers:', answers); // Debug log
-
-        // Fill form fields with answers
-        for (const { element, question } of inputMap) {
-            const answerObj = answers.find(a => a.question && a.question.trim() === question);
-            if (answerObj && answerObj.answer) {
-                console.log(`Filling answer for question "${question}":`, answerObj.answer); // Debug log
-                fillInput(element, answerObj.answer);
-            } else {
-                console.log(`No answer found for question "${question}"`); // Debug log
-                fillInput(element, ''); // Leave blank if no answer found
-            }
-        }
-
-        return { success: true };
-    } catch (error) {
-        console.error('Form filling error:', error);
-        return { success: false, error: error.message };
-    }
-}
-
-// Helper function to find label for an input
-function findLabel(input) {
-    // Check for label with 'for' attribute
-    const id = input.id;
-    if (id) {
-        const label = document.querySelector(`label[for="${id}"]`);
-        if (label) return label.textContent.trim();
-    }
-
-    // Check for parent label
-    const parentLabel = input.closest('label');
-    if (parentLabel) {
-        const labelText = parentLabel.textContent.trim();
-        return labelText.replace(input.value, '').trim();
-    }
-
-    // Check for preceding label
-    const precedingLabel = input.previousElementSibling;
-    if (precedingLabel && precedingLabel.tagName === 'LABEL') {
-        return precedingLabel.textContent.trim();
-    }
-
-    return null;
-}
-
-// Helper function to fill input with answer
-function fillInput(element, answer) {
-    if (element.tagName === 'SELECT') {
-        // Handle select elements
-        const options = Array.from(element.options);
-        const matchingOption = options.find(option => 
-            option.text.toLowerCase().includes(answer.toLowerCase())
-        );
-        if (matchingOption) {
-            element.value = matchingOption.value;
-        }
-    } else {
-        // Handle text inputs and textareas
-        element.value = answer;
-    }
-
-    // Trigger change event
-    element.dispatchEvent(new Event('change', { bubbles: true }));
-    element.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
-// Helper function to get UID from Chrome storage
-async function getUID() {
-    return new Promise((resolve) => {
-        chrome.storage.local.get(['formmate_uid'], function(result) {
-            resolve(result.formmate_uid || null);
-        });
     });
+    
+    console.log('All extracted questions:', questions);
+    return questions;
 }
 
-// Helper function to fetch answers from backend
-async function fetchAnswersFromBackend(uid, questions) {
-    try {
-        console.log('Sending request to backend with:', { uid, questions }); // Debug log
-        
-        // Try different backend URLs
-        const backendUrls = [
-            'http://localhost:5000',
-            'https://formmate-ai-backend.onrender.com',  // Add your production URL here
-            'http://127.0.0.1:5000'
-        ];
+// Function to normalize question text
+function normalizeQuestion(question) {
+    // Convert to lowercase and remove special characters
+    let normalized = question.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .trim();
 
-        let lastError = null;
-        for (const baseUrl of backendUrls) {
+    // Map common variations to standard terms
+    const variations = {
+        'contact number': ['phone', 'mobile', 'cell', 'telephone', 'contact'],
+        'name': ['full name', 'your name', 'first name', 'last name'],
+        'email': ['email address', 'email id', 'mail'],
+        'location': ['city', 'current location', 'where are you', 'where do you live'],
+        'hometown': ['native place', 'home town', 'where are you from'],
+        'role': ['position', 'job title', 'designation', 'what role', 'what position'],
+        'prn': ['permanent registration number', 'registration number', 'roll number'],
+        'cpi': ['cgpa', 'grade', 'score', 'percentage'],
+        'branch': ['stream', 'course', 'specialization', 'major'],
+        'joining': ['join date', 'when can you join', 'how soon can you join', 'availability', 'notice period', 'joining time', 'joining period', 'joining duration']
+    };
+
+    // Check for variations
+    for (const [standard, vars] of Object.entries(variations)) {
+        if (vars.some(v => normalized.includes(v))) {
+            normalized = standard;
+            break;
+        }
+    }
+
+    return normalized;
+}
+
+// Function to fill form fields
+async function fillFormFields(answers) {
+    const questions = extractQuestions();
+    let filledCount = 0;
+    let errorCount = 0;
+    
+    console.log('Questions to fill:', questions);
+    console.log('Answers received:', answers);
+    
+    for (const answer of answers) {
+        console.log(`Processing answer for question: "${answer.question}"`);
+        console.log(`Matched with knowledge base question: "${answer.matched_question}"`);
+        
+        const matchingQuestion = questions.find(q => q.question === answer.question);
+        
+        if (matchingQuestion) {
             try {
-                const response = await fetch(`${baseUrl}/api/process-form`, {
+                const element = matchingQuestion.element;
+                console.log(`Filling field "${matchingQuestion.question}" with answer: "${answer.answer}"`);
+                
+                // Handle different input types
+                switch (element.type) {
+                    case 'checkbox':
+                        element.checked = answer.answer.toLowerCase() === 'yes' || 
+                                        answer.answer.toLowerCase() === 'true';
+                        break;
+                        
+                    case 'radio':
+                        const radioInputs = document.querySelectorAll(`input[name="${element.name}"]`);
+                        radioInputs.forEach(radio => {
+                            radio.checked = radio.value.toLowerCase() === answer.answer.toLowerCase();
+                        });
+                        break;
+                        
+                    case 'select-one':
+                        const options = Array.from(element.options);
+                        const matchingOption = options.find(opt => 
+                            opt.text.toLowerCase() === answer.answer.toLowerCase()
+                        );
+                        if (matchingOption) {
+                            element.value = matchingOption.value;
+                        }
+                        break;
+                        
+                    default:
+                        // For Google Forms, we need to trigger the input event
+                        element.value = answer.answer;
+                        element.dispatchEvent(new Event('input', { bubbles: true }));
+                        element.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                
+                filledCount++;
+                console.log(`Successfully filled field: "${matchingQuestion.question}"`);
+                
+            } catch (error) {
+                console.error('Error filling field:', error);
+                errorCount++;
+            }
+        } else {
+            console.log(`No matching field found for question: "${answer.question}"`);
+        }
+    }
+    
+    console.log(`Form fill complete. Filled ${filledCount} fields, ${errorCount} errors.`);
+    return {
+        total: questions.length,
+        filled: filledCount,
+        errors: errorCount
+    };
+}
+
+// Listen for messages from popup
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'checkForm') {
+        const questions = extractQuestions();
+        sendResponse({
+            ready: questions.length > 0,
+            fieldCount: questions.length
+        });
+    }
+    
+    else if (request.action === 'fillForm') {
+        // Get auth token from background script
+        chrome.runtime.sendMessage({ action: 'getAuthToken' }, async (response) => {
+            if (!response || !response.token) {
+                console.error('No auth token found');
+                sendResponse({
+                    success: false,
+                    error: 'Not authenticated. Please log in.'
+                });
+                return;
+            }
+            
+            try {
+                const questions = extractQuestions();
+                console.log('Extracted questions:', questions);
+                
+                // Send questions to backend
+                const backendResponse = await fetch('http://localhost:5000/api/process-form', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${response.token}`
                     },
                     body: JSON.stringify({
-                        uid: uid,
-                        questions: questions
+                        questions: questions.map(q => ({ question: q.question }))
                     })
                 });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error(`Backend error response from ${baseUrl}:`, errorText);
-                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                
+                if (!backendResponse.ok) {
+                    const errorData = await backendResponse.json();
+                    throw new Error(errorData.error || 'Failed to get answers from backend');
                 }
-
-                const data = await response.json();
-                console.log('Backend response:', data);
-                return data;
+                
+                const answers = await backendResponse.json();
+                console.log('Received answers:', answers);
+                
+                // Fill the form with answers
+                const result = await fillFormFields(answers);
+                console.log('Form fill result:', result);
+                
+                sendResponse({
+                    success: true,
+                    result: result
+                });
+                
             } catch (error) {
-                console.log(`Failed to connect to ${baseUrl}:`, error);
-                lastError = error;
-                continue; // Try next URL
+                console.error('Error filling form:', error);
+                sendResponse({
+                    success: false,
+                    error: error.message
+                });
             }
-        }
-
-        // If all URLs failed
-        throw lastError || new Error('Failed to connect to any backend server');
-    } catch (error) {
-        console.error('Error fetching answers from backend:', error);
-        return null;
+        });
+        
+        return true; // Required for async sendResponse
     }
-} 
+}); 

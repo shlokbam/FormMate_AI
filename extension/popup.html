@@ -89,10 +89,21 @@
             <div id="qa-manager" class="tab-content">
                 <div class="qa-header">
                     <input type="text" id="qa-search" placeholder="Search Q&A...">
-                    <button id="add-qa-btn" class="primary-btn">Add New</button>
                 </div>
                 <div id="qa-list" class="qa-list">
                     <!-- Q&A items will be added here dynamically -->
+                </div>
+                <div class="qa-form">
+                    <input type="hidden" id="qa-id">
+                    <div class="form-group">
+                        <label for="qa-question">Question</label>
+                        <input type="text" id="qa-question" placeholder="Enter question">
+                    </div>
+                    <div class="form-group">
+                        <label for="qa-answer">Answer</label>
+                        <textarea id="qa-answer" placeholder="Enter answer"></textarea>
+                    </div>
+                    <button id="add-qa-btn" class="primary-btn">Add Q&A</button>
                 </div>
             </div>
 

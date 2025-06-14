@@ -3,10 +3,13 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import os
 import google.generativeai as genai
-from datetime import datetime
-from firebase_admin import credentials, initialize_app, firestore
+from datetime import datetime, timedelta
+from firebase_admin import credentials, initialize_app, firestore, auth
+import firebase_admin
 import json
 import re
+import jwt
+from functools import wraps
 
 # Load environment variables
 load_dotenv()
@@ -25,6 +28,10 @@ print("\n")
 app = Flask(__name__, static_folder='../dashboard')
 CORS(app)
 
+# JWT Configuration
+JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key')  # Change this in production
+JWT_ALGORITHM = 'HS256'
+
 # Initialize Gemini
 gemini_api_key = os.getenv('GEMINI_API_KEY')
 if not gemini_api_key:
@@ -34,7 +41,7 @@ else:
     model = genai.GenerativeModel('gemini-1.5-pro-002')
     print("Gemini API key initialized")
 
-# Initialize Firebase
+# Initialize Firebase Admin SDK
 try:
     print("Loading Firebase credentials...")
     
@@ -56,13 +63,341 @@ try:
         "client_x509_cert_url": os.getenv('FIREBASE_CLIENT_CERT_URL')
     })
     
-    print("Initializing Firebase app...")
-    initialize_app(cred)
+    print("Initializing Firebase Admin SDK...")
+    firebase_admin.initialize_app(cred)
     db = firestore.client()
-    print("Firebase initialized successfully!")
+    print("Firebase Admin SDK initialized successfully!")
+
 except Exception as e:
     print(f"Error initializing Firebase: {str(e)}")
     raise e
+
+# Authentication decorator
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        auth_header = request.headers.get('Authorization')
+        
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+        
+        if not token:
+            return jsonify({'message': 'Token is missing'}), 401
+        
+        try:
+            print(f"\nValidating token...")
+            data = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            print(f"Token decoded successfully. User ID: {data['uid']}")
+            
+            user_ref = db.collection('users').document(data['uid'])
+            current_user = user_ref.get()
+            
+            if not current_user.exists:
+                print(f"User document not found for ID: {data['uid']}")
+                # Create the user document if it doesn't exist
+                try:
+                    print(f"Creating user document for ID: {data['uid']}")
+                    user_ref.set({
+                        'email': data['email'],
+                        'created_at': datetime.now(),
+                        'knowledge_base': []
+                    })
+                    current_user = user_ref.get()
+                    print("User document created successfully")
+                except Exception as e:
+                    print(f"Error creating user document: {str(e)}")
+                    return jsonify({'message': 'Error creating user document'}), 500
+            
+            return f(current_user, *args, **kwargs)
+        except Exception as e:
+            print(f"Token validation error: {str(e)}")
+            return jsonify({'message': 'Token is invalid'}), 401
+    
+    return decorated
+
+# Authentication endpoints
+@app.route('/api/register', methods=['POST'])
+def register():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+        
+        if not email or not password:
+            return jsonify({'error': 'Email and password are required'}), 400
+        
+        try:
+            # Create user in Firebase Auth
+            user = auth.create_user(
+                email=email,
+                password=password
+            )
+            
+            # Create user document in Firestore
+            user_data = {
+                'email': email,
+                'created_at': datetime.now(),
+                'knowledge_base': []
+            }
+            db.collection('users').document(user.uid).set(user_data)
+            
+            # Generate JWT token
+            token = jwt.encode({
+                'uid': user.uid,
+                'email': email,
+                'exp': datetime.utcnow() + timedelta(days=1)
+            }, JWT_SECRET, algorithm=JWT_ALGORITHM)
+            
+            return jsonify({
+                'token': token,
+                'user': {
+                    'uid': user.uid,
+                    'email': email
+                }
+            }), 201
+            
+        except auth.EmailAlreadyExistsError:
+            return jsonify({'error': 'Email already exists'}), 400
+        except Exception as e:
+            return jsonify({'error': str(e)}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+        
+        print(f"\nLogin attempt for email: {email}")
+        
+        if not email or not password:
+            print("Error: Email or password missing")
+            return jsonify({'error': 'Email and password are required'}), 400
+        
+        try:
+            # Get user by email
+            print("Attempting to get user from Firebase...")
+            user = auth.get_user_by_email(email)
+            print(f"User found in Firebase: {user.uid}")
+            
+            # Verify password using custom token
+            custom_token = auth.create_custom_token(user.uid)
+            print("Custom token created successfully")
+            
+            # Generate JWT token
+            token = jwt.encode({
+                'uid': user.uid,
+                'email': email,
+                'exp': datetime.utcnow() + timedelta(days=1)
+            }, JWT_SECRET, algorithm=JWT_ALGORITHM)
+            
+            print("JWT token generated successfully")
+            
+            return jsonify({
+                'token': token,
+                'user': {
+                    'uid': user.uid,
+                    'email': email
+                }
+            })
+            
+        except auth.UserNotFoundError:
+            print("Error: User not found in Firebase")
+            return jsonify({'error': 'User not found'}), 401
+        except Exception as e:
+            print(f"Firebase error: {str(e)}")
+            return jsonify({'error': 'Authentication failed'}), 401
+        
+    except Exception as e:
+        print(f"General error: {str(e)}")
+        return jsonify({'error': 'Invalid credentials'}), 401
+
+@app.route('/api/validate-token', methods=['GET'])
+@token_required
+def validate_token(current_user):
+    return jsonify({
+        'user': {
+            'uid': current_user.id,
+            'email': current_user.get('email')
+        }
+    })
+
+# Q&A Management endpoints
+@app.route('/api/qa', methods=['GET'])
+@token_required
+def get_qa_items(current_user):
+    try:
+        qa_ref = db.collection('users').document(current_user.id).collection('knowledge_base')
+        qa_docs = qa_ref.get()
+        
+        qa_items = []
+        for doc in qa_docs:
+            qa_data = doc.to_dict()
+            qa_items.append({
+                'id': doc.id,
+                'question': qa_data.get('question', ''),
+                'answer': qa_data.get('answer', '')
+            })
+        
+        return jsonify(qa_items)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/qa', methods=['POST'])
+@token_required
+def add_qa_item(current_user):
+    try:
+        data = request.get_json()
+        question = data.get('question')
+        answer = data.get('answer')
+        
+        if not question or not answer:
+            return jsonify({'error': 'Question and answer are required'}), 400
+        
+        qa_ref = db.collection('users').document(current_user.id).collection('knowledge_base')
+        qa_doc = qa_ref.add({
+            'question': question,
+            'answer': answer,
+            'created_at': datetime.now()
+        })
+        
+        return jsonify({
+            'id': qa_doc[1].id,
+            'question': question,
+            'answer': answer
+        }), 201
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/qa/<qa_id>', methods=['PUT'])
+@token_required
+def update_qa_item(current_user, qa_id):
+    try:
+        data = request.get_json()
+        question = data.get('question')
+        answer = data.get('answer')
+        
+        if not question or not answer:
+            return jsonify({'error': 'Question and answer are required'}), 400
+        
+        qa_ref = db.collection('users').document(current_user.id).collection('knowledge_base').document(qa_id)
+        qa_ref.update({
+            'question': question,
+            'answer': answer,
+            'updated_at': datetime.now()
+        })
+        
+        return jsonify({
+            'id': qa_id,
+            'question': question,
+            'answer': answer
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/qa/<qa_id>', methods=['DELETE'])
+@token_required
+def delete_qa_item(current_user, qa_id):
+    try:
+        qa_ref = db.collection('users').document(current_user.id).collection('knowledge_base').document(qa_id)
+        qa_ref.delete()
+        return jsonify({'message': 'Q&A item deleted successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Profile Management endpoints
+@app.route('/api/change-password', methods=['POST'])
+@token_required
+def change_password(current_user):
+    try:
+        data = request.get_json()
+        new_password = data.get('password')
+        
+        if not new_password:
+            return jsonify({'error': 'New password is required'}), 400
+        
+        # Update password in Firebase Auth
+        auth_client.update_user(
+            current_user.id,
+            password=new_password
+        )
+        
+        return jsonify({'message': 'Password updated successfully'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Form Processing endpoint
+@app.route('/api/process-form', methods=['POST'])
+@token_required
+def process_form(current_user):
+    try:
+        data = request.get_json()
+        questions = data.get('questions', [])
+        
+        # Get user's knowledge base
+        kb_ref = db.collection('users').document(current_user.id).collection('knowledge_base')
+        
+        # Get all Q&A items
+        qa_items = kb_ref.stream()
+        qa_list = [{'id': qa.id, **qa.to_dict()} for qa in qa_items]
+        
+        print(f"\nProcessing form with {len(questions)} questions")
+        print(f"Found {len(qa_list)} Q&A items in knowledge base")
+        
+        answers = []
+        for question in questions:
+            # Normalize the question
+            normalized_question = question['question'].lower().strip()
+            print(f"\nProcessing question: {normalized_question}")
+            
+            # Find matching Q&A item using word-based matching
+            matching_qa = None
+            best_match_score = 0
+            
+            for qa in qa_list:
+                qa_question = qa['question'].lower().strip()
+                print(f"Comparing with Q&A: {qa_question}")
+                
+                # Split questions into words
+                form_words = set(normalized_question.split())
+                qa_words = set(qa_question.split())
+                
+                # Calculate word overlap
+                common_words = form_words.intersection(qa_words)
+                match_score = len(common_words) / max(len(form_words), len(qa_words))
+                
+                print(f"Match score: {match_score:.2f} (common words: {common_words})")
+                
+                # Update best match if this score is higher
+                if match_score > best_match_score:
+                    best_match_score = match_score
+                    matching_qa = qa
+            
+            # Use a threshold to determine if the match is good enough
+            if matching_qa and best_match_score >= 0.3:  # 30% word overlap threshold
+                answers.append({
+                    'question': question['question'],
+                    'answer': matching_qa['answer'],
+                    'matched_question': matching_qa['question'],
+                    'match_score': best_match_score
+                })
+                print(f"Found match (score: {best_match_score:.2f}): {matching_qa['question']}")
+                print(f"Added answer: {matching_qa['answer']}")
+            else:
+                print(f"No good match found for: {normalized_question}")
+        
+        print(f"\nReturning {len(answers)} answers")
+        return jsonify(answers)
+    except Exception as e:
+        print(f"Error processing form: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 # Serve dashboard files
 @app.route('/')
@@ -85,129 +420,6 @@ def get_config():
         'FIREBASE_APP_ID': os.getenv('FIREBASE_APP_ID')
     }
     return jsonify(config)
-
-def normalize_question(text):
-    if not text:
-        return ''
-    
-    # Remove asterisks and other special characters first
-    text = text.replace('*', '').strip()
-    
-    # Convert to lowercase and remove remaining special characters
-    text = text.lower().strip()
-    text = re.sub(r'[^a-z0-9\s]+', '', text)  # keep only alphanumerics and spaces
-    
-    # Common variations mapping
-    variations = {
-        'contact number': ['phone number', 'mobile number', 'cell number', 'telephone number', 'contact', 'phone', 'mobile', 'telephone'],
-        'name': ['full name', 'complete name', 'your name', 'fullname', 'first name', 'last name', 'given name', 'surname'],
-        'email': ['email address', 'e mail', 'e-mail', 'mail id', 'mail address'],
-        'location': ['current location', 'where are you', 'your location', 'present location', 'current place', 'where do you live', 'residence', 'address', 'city', 'state', 'country'],
-        'hometown': ['home town', 'native place', 'place of origin', 'where are you from', 'birth place', 'native city', 'birth city', 'birth town'],
-        'role': ['role applied for', 'position', 'job role', 'applied position', 'desired role', 'job title', 'applying for', 'job position'],
-        'prn': ['permanent registration number', 'registration number', 'student id', 'roll number', 'enrollment number'],
-        'cpi': ['cumulative performance index', 'cgpa', 'grade point average', 'academic performance', 'performance index'],
-        'branch': ['department', 'course', 'stream', 'field of study', 'major', 'specialization']
-    }
-
-    # First try exact match
-    for standard, alts in variations.items():
-        if text == standard or text in alts:
-            return standard
-
-    # Then try partial match
-    for standard, alts in variations.items():
-        if any(alt in text for alt in [standard] + alts):
-            return standard
-
-    # Special cases for common fields
-    if 'name' in text:
-        return 'name'
-    if any(word in text for word in ['location', 'where', 'place', 'address', 'city', 'state', 'country']):
-        return 'location'
-    if any(word in text for word in ['home', 'town', 'native', 'birth']):
-        return 'hometown'
-    if any(word in text for word in ['role', 'position', 'job', 'applying']):
-        return 'role'
-    if any(word in text for word in ['phone', 'contact', 'mobile', 'telephone']):
-        return 'contact number'
-    if any(word in text for word in ['email', 'mail']):
-        return 'email'
-    if any(word in text for word in ['prn', 'registration', 'roll', 'enrollment']):
-        return 'prn'
-    if any(word in text for word in ['cpi', 'cgpa', 'grade', 'performance']):
-        return 'cpi'
-    if any(word in text for word in ['branch', 'department', 'course', 'stream']):
-        return 'branch'
-
-    return text
-
-@app.route('/api/process-form', methods=['POST'])
-def process_form():
-    try:
-        data = request.get_json()
-        uid = data.get('uid')
-        if not uid:
-            return jsonify({'error': 'No user ID provided'}), 400
-        if not data or 'questions' not in data:
-            return jsonify({'error': 'No questions provided'}), 400
-
-        questions = data['questions']
-        if not isinstance(questions, list):
-            return jsonify({'error': 'Questions must be a list'}), 400
-
-        answers = []
-        
-        for question_data in questions:
-            question = question_data.get('question', '').strip()
-            if not question:
-                continue
-
-            print(f"\nProcessing question: {question}")
-
-            normalized_question = normalize_question(question)
-            print(f"Normalized question: {normalized_question}")
-
-            # Use the user's UID in the Firestore path
-            try:
-                qa_ref = db.collection('users').document(uid).collection('knowledge_base')
-                qa_docs = qa_ref.get()
-                found_match = False
-                for doc in qa_docs:
-                    qa_data = doc.to_dict()
-                    stored_question = normalize_question(qa_data.get('question', ''))
-                    print(f"Comparing with stored question: {stored_question}")
-                    if stored_question == normalized_question:
-                        print(f"Found matching Q&A in database: {qa_data}")
-                        answers.append({
-                            'question': question,
-                            'answer': qa_data.get('answer', ''),
-                            'source': 'database'
-                        })
-                        found_match = True
-                        break
-                if not found_match:
-                    print(f"No matching Q&A found in database for: {question}")
-                    answers.append({
-                        'question': question,
-                        'answer': '',
-                        'source': 'database',
-                        'error': 'No answer found in knowledge base. Please add this question to your knowledge base.'
-                    })
-            except Exception as e:
-                print(f"Error checking Firestore for question '{question}': {str(e)}")
-                answers.append({
-                    'question': question,
-                    'answer': '',
-                    'source': 'database',
-                    'error': f'Error accessing knowledge base: {str(e)}'
-                })
-
-        return jsonify(answers)
-
-    except Exception as e:
-        print(f"Error processing form: {str(e)}")
-        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True) 
