@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
-import openai
 import google.generativeai as genai
 from datetime import datetime
 from firebase_admin import credentials, initialize_app, firestore
@@ -20,17 +19,20 @@ print("FIREBASE_PRIVATE_KEY:", "Present" if os.getenv('FIREBASE_PRIVATE_KEY') el
 print("FIREBASE_CLIENT_EMAIL:", os.getenv('FIREBASE_CLIENT_EMAIL'))
 print("FIREBASE_CLIENT_ID:", os.getenv('FIREBASE_CLIENT_ID'))
 print("FIREBASE_CLIENT_CERT_URL:", os.getenv('FIREBASE_CLIENT_CERT_URL'))
+print("GEMINI_API_KEY:", "Present" if os.getenv('GEMINI_API_KEY') else "Missing")
 print("\n")
 
 app = Flask(__name__, static_folder='../dashboard')
 CORS(app)
 
-# Initialize OpenAI
-openai.api_key = os.getenv('OPENAI_API_KEY')
-
 # Initialize Gemini
-genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-model = genai.GenerativeModel('gemini-pro')
+gemini_api_key = os.getenv('GEMINI_API_KEY')
+if not gemini_api_key:
+    print("Warning: GEMINI_API_KEY is not set")
+else:
+    genai.configure(api_key=gemini_api_key)
+    model = genai.GenerativeModel('gemini-1.5-pro-002')
+    print("Gemini API key initialized")
 
 # Initialize Firebase
 try:
@@ -85,10 +87,59 @@ def get_config():
     return jsonify(config)
 
 def normalize_question(text):
-    # Lowercase, remove special characters, normalize whitespace
-    text = text.lower()
-    text = re.sub(r'[^a-z0-9 ]+', '', text)  # keep only alphanumerics and spaces
-    text = ' '.join(text.split())
+    if not text:
+        return ''
+    
+    # Remove asterisks and other special characters first
+    text = text.replace('*', '').strip()
+    
+    # Convert to lowercase and remove remaining special characters
+    text = text.lower().strip()
+    text = re.sub(r'[^a-z0-9\s]+', '', text)  # keep only alphanumerics and spaces
+    
+    # Common variations mapping
+    variations = {
+        'contact number': ['phone number', 'mobile number', 'cell number', 'telephone number', 'contact', 'phone', 'mobile', 'telephone'],
+        'name': ['full name', 'complete name', 'your name', 'fullname', 'first name', 'last name', 'given name', 'surname'],
+        'email': ['email address', 'e mail', 'e-mail', 'mail id', 'mail address'],
+        'location': ['current location', 'where are you', 'your location', 'present location', 'current place', 'where do you live', 'residence', 'address', 'city', 'state', 'country'],
+        'hometown': ['home town', 'native place', 'place of origin', 'where are you from', 'birth place', 'native city', 'birth city', 'birth town'],
+        'role': ['role applied for', 'position', 'job role', 'applied position', 'desired role', 'job title', 'applying for', 'job position'],
+        'prn': ['permanent registration number', 'registration number', 'student id', 'roll number', 'enrollment number'],
+        'cpi': ['cumulative performance index', 'cgpa', 'grade point average', 'academic performance', 'performance index'],
+        'branch': ['department', 'course', 'stream', 'field of study', 'major', 'specialization']
+    }
+
+    # First try exact match
+    for standard, alts in variations.items():
+        if text == standard or text in alts:
+            return standard
+
+    # Then try partial match
+    for standard, alts in variations.items():
+        if any(alt in text for alt in [standard] + alts):
+            return standard
+
+    # Special cases for common fields
+    if 'name' in text:
+        return 'name'
+    if any(word in text for word in ['location', 'where', 'place', 'address', 'city', 'state', 'country']):
+        return 'location'
+    if any(word in text for word in ['home', 'town', 'native', 'birth']):
+        return 'hometown'
+    if any(word in text for word in ['role', 'position', 'job', 'applying']):
+        return 'role'
+    if any(word in text for word in ['phone', 'contact', 'mobile', 'telephone']):
+        return 'contact number'
+    if any(word in text for word in ['email', 'mail']):
+        return 'email'
+    if any(word in text for word in ['prn', 'registration', 'roll', 'enrollment']):
+        return 'prn'
+    if any(word in text for word in ['cpi', 'cgpa', 'grade', 'performance']):
+        return 'cpi'
+    if any(word in text for word in ['branch', 'department', 'course', 'stream']):
+        return 'branch'
+
     return text
 
 @app.route('/api/process-form', methods=['POST'])
@@ -115,6 +166,7 @@ def process_form():
             print(f"\nProcessing question: {question}")
 
             normalized_question = normalize_question(question)
+            print(f"Normalized question: {normalized_question}")
 
             # Use the user's UID in the Firestore path
             try:
@@ -124,6 +176,7 @@ def process_form():
                 for doc in qa_docs:
                     qa_data = doc.to_dict()
                     stored_question = normalize_question(qa_data.get('question', ''))
+                    print(f"Comparing with stored question: {stored_question}")
                     if stored_question == normalized_question:
                         print(f"Found matching Q&A in database: {qa_data}")
                         answers.append({
@@ -133,42 +186,22 @@ def process_form():
                         })
                         found_match = True
                         break
-                if found_match:
-                    continue
-                else:
+                if not found_match:
                     print(f"No matching Q&A found in database for: {question}")
+                    answers.append({
+                        'question': question,
+                        'answer': '',
+                        'source': 'database',
+                        'error': 'No answer found in knowledge base. Please add this question to your knowledge base.'
+                    })
             except Exception as e:
                 print(f"Error checking Firestore for question '{question}': {str(e)}")
-                # Continue to AI processing if database check fails
-
-            # If no match found or error occurred, use AI
-            try:
-                print(f"Using AI to generate answer for: {question}")
-                openai_response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": f"You are a helpful assistant. Answer the following question in a concise way. Question type: {question_data.get('type', 'text')}"},
-                        {"role": "user", "content": question}
-                    ],
-                    max_tokens=150
-                )
-                answer = openai_response.choices[0].message.content.strip()
-            except Exception as e:
-                print(f"OpenAI error for question '{question}': {str(e)}")
-                try:
-                    gemini_response = model.generate_content(
-                        f"Answer this question concisely: {question}"
-                    )
-                    answer = gemini_response.text.strip()
-                except Exception as e:
-                    print(f"Gemini error for question '{question}': {str(e)}")
-                    answer = "Sorry, I couldn't generate an answer at this time."
-
-            answers.append({
-                'question': question,
-                'answer': answer,
-                'source': 'ai'
-            })
+                answers.append({
+                    'question': question,
+                    'answer': '',
+                    'source': 'database',
+                    'error': f'Error accessing knowledge base: {str(e)}'
+                })
 
         return jsonify(answers)
 

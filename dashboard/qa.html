@@ -5,51 +5,58 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Q&A Manager - FormMate AI</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
-    <div class="dashboard">
-        <nav class="sidebar">
-            <div class="logo">
-                <h1>FormMate AI</h1>
-            </div>
-            <ul>
-                <li><a href="dashboard.html">Dashboard</a></li>
-                <li class="active"><a href="qa.html">Q&A Manager</a></li>
-                <li><a href="form_processor.html">Form Processor</a></li>
-                <li><a href="history.html">Submission History</a></li>
-                <li><button id="logoutBtn" class="btn-logout">Logout</button></li>
-            </ul>
-        </nav>
+    <nav class="navbar">
+        <div class="nav-brand">FormMate AI</div>
+        <div class="nav-menu">
+            <a href="dashboard.html" class="nav-item">Dashboard</a>
+            <a href="qa.html" class="nav-item">Q&amp;A Manager</a>
+            <a href="history.html" class="nav-item">Submission History</a>
+            <span id="userEmail" class="nav-item"></span>
+            <button id="logoutBtn" class="btn-secondary">Logout</button>
+        </div>
+    </nav>
 
-        <main class="main-content">
-            <h1>Q&A Manager</h1>
-            <p>Manage your Q&A pairs for AI form processing</p>
+    <main class="qa-manager">
+        <h1>Q&amp;A Manager</h1>
+        <p>Manage your question-answer pairs for form filling</p>
+        <button id="addQaBtn" class="btn-primary">+ Add New Q&amp;A Pair</button>
+        <div class="search-bar">
+            <input type="text" id="searchQa" placeholder="Search Q&amp;A pairs...">
+            <button id="searchBtn"><span>&#128269;</span></button>
+        </div>
+        <div id="qaList" class="qa-list"></div>
+    </main>
 
-            <div class="qa-container">
-                <form id="qaForm" class="qa-form">
-                    <div class="form-group">
-                        <label for="question">Question:</label>
-                        <input type="text" id="question" required placeholder="Enter a question">
-                    </div>
-                    <div class="form-group">
-                        <label for="answer">Answer:</label>
-                        <textarea id="answer" required placeholder="Enter the answer"></textarea>
-                    </div>
-                    <button type="submit" class="btn-primary">Add Q&A</button>
-                </form>
-
-                <div id="qaList" class="qa-list">
-                    <!-- Q&A pairs will be loaded here -->
+    <!-- Q&A Modal -->
+    <div id="qaModal" class="modal">
+        <div class="modal-content">
+            <h2 id="modalTitle">Add Q&A Pair</h2>
+            <form id="qaForm">
+                <div class="form-group">
+                    <label for="question">Question:</label>
+                    <input type="text" id="question" required>
                 </div>
-            </div>
-        </main>
+                <div class="form-group">
+                    <label for="answer">Answer:</label>
+                    <textarea id="answer" required></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancelBtn" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
+            <button id="closeModal" class="close-modal">&times;</button>
+        </div>
     </div>
 
-    <script src="js/config.js"></script>
-    <script src="js/firebase.js"></script>
-    <script src="js/qa.js"></script>
+    <!-- JavaScript -->
+    <script type="module" src="js/config.js"></script>
+    <script type="module" src="js/qa.js"></script>
 </body>
 </html> 

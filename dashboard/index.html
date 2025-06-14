@@ -3,88 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FormMate AI - Login</title>
+    <title>FormMate AI - Smart Form Filling</title>
     <link rel="stylesheet" href="styles.css">
-    <style>
-        .toggle-btns {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        .toggle-btns button {
-            flex: 1;
-            padding: 12px 0;
-            font-size: 1rem;
-            border: none;
-            background: #e0e0e0;
-            color: #222;
-            cursor: pointer;
-            border-radius: 6px 6px 0 0;
-            transition: background 0.2s;
-        }
-        .toggle-btns button.active {
-            background: #43b047;
-            color: #fff;
-        }
-        .auth-form {
-            display: none;
-        }
-        .auth-form.active {
-            display: block;
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <div class="auth-container">
-        <h1>FormMate AI</h1>
-        <p>Your AI-powered form assistant</p>
-        <div class="toggle-btns">
-            <button id="show-login" class="active">Login</button>
-            <button id="show-register">Register</button>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i class="fas fa-robot"></i>
+            <span>FormMate AI</span>
         </div>
-        <form id="login-form" class="auth-form active">
-            <label for="login-email">Email</label>
-            <input type="email" id="login-email" required>
-            <label for="login-password">Password</label>
-            <input type="password" id="login-password" required>
-            <button type="submit" class="primary-btn">Login</button>
-        </form>
-        <form id="register-form" class="auth-form">
-            <label for="register-email">Email</label>
-            <input type="email" id="register-email" required>
-            <label for="register-password">Password</label>
-            <input type="password" id="register-password" required>
-            <label for="register-confirm">Confirm Password</label>
-            <input type="password" id="register-confirm" required>
-            <button type="submit" class="primary-btn">Create Account</button>
-        </form>
-        <div id="auth-error" class="error-message"></div>
-    </div>
-    <!-- Firebase UMD CDN (compat) -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#how-it-works">How It Works</a>
+            <a href="login.html" class="btn btn-primary" id="authBtn">Login / Register</a>
+        </div>
+    </nav>
+    <main>
+        <section class="hero">
+            <div class="hero-content">
+                <h1>Fill Forms with AI</h1>
+                <p>Save time and reduce errors with our smart form filling assistant.</p>
+                <a href="login.html" class="btn btn-primary" id="getStartedBtn">Get Started</a>
+            </div>
+            <div class="hero-image">
+                <img src="https://placehold.co/600x400" alt="FormMate AI in action">
+            </div>
+        </section>
+        <section id="features" class="features">
+            <h2>Features</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <i class="fas fa-bolt"></i>
+                    <h3>Fast & Accurate</h3>
+                    <p>Fill forms in seconds with AI-powered accuracy</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-shield-alt"></i>
+                    <h3>Secure</h3>
+                    <p>Your data is encrypted and never stored</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-magic"></i>
+                    <h3>Smart</h3>
+                    <p>Learns from your preferences over time</p>
+                </div>
+            </div>
+        </section>
+        <section id="how-it-works" class="how-it-works">
+            <h2>How It Works</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Install Extension</h3>
+                    <p>Add FormMate AI to your browser</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Browse Forms</h3>
+                    <p>Go to any form you need to fill</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Click & Fill</h3>
+                    <p>Let AI handle the rest</p>
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>FormMate AI</h3>
+                <p>Making form filling easier</p>
+            </div>
+            <div class="footer-section">
+                <h3>Links</h3>
+                <a href="#features">Features</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#">Privacy</a>
+                <a href="#">Terms</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 FormMate AI</p>
+        </div>
+    </footer>
+
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <!-- Our Scripts -->
     <script src="js/config.js"></script>
-    <script src="js/firebase.js"></script>
-    <script src="js/auth.js"></script>
-    <script>
-        // Toggle logic
-        const loginBtn = document.getElementById('show-login');
-        const registerBtn = document.getElementById('show-register');
-        const loginForm = document.getElementById('login-form');
-        const registerForm = document.getElementById('register-form');
-        loginBtn.onclick = () => {
-            loginBtn.classList.add('active');
-            registerBtn.classList.remove('active');
-            loginForm.classList.add('active');
-            registerForm.classList.remove('active');
-        };
-        registerBtn.onclick = () => {
-            registerBtn.classList.add('active');
-            loginBtn.classList.remove('active');
-            registerForm.classList.add('active');
-            loginForm.classList.remove('active');
-        };
-    </script>
+    <script src="js/app.js"></script>
 </body>
 </html> 

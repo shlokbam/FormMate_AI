@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FormMate AI</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Auth Section (shown when not logged in) -->
+        <div id="auth-section" class="section">
+            <div class="header">
+                <h1>FormMate AI</h1>
+                <p>Your Smart Form Assistant</p>
+            </div>
+
+            <!-- Login Form -->
+            <div id="login-form" class="auth-form">
+                <h2>Login</h2>
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="Enter your email">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" placeholder="Enter your password">
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="remember-me">
+                        Remember me
+                    </label>
+                </div>
+                <button id="login-btn" class="primary-btn">Login</button>
+                <p class="auth-switch">Don't have an account? <a href="#" id="show-register">Register</a></p>
+            </div>
+
+            <!-- Register Form -->
+            <div id="register-form" class="auth-form" style="display: none;">
+                <h2>Register</h2>
+                <div class="form-group">
+                    <label for="register-email">Email</label>
+                    <input type="email" id="register-email" placeholder="Enter your email">
+                </div>
+                <div class="form-group">
+                    <label for="register-password">Password</label>
+                    <input type="password" id="register-password" placeholder="Enter your password">
+                </div>
+                <div class="form-group">
+                    <label for="register-confirm-password">Confirm Password</label>
+                    <input type="password" id="register-confirm-password" placeholder="Confirm your password">
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="terms-checkbox">
+                        I agree to the Terms & Conditions
+                    </label>
+                </div>
+                <button id="register-btn" class="primary-btn">Register</button>
+                <p class="auth-switch">Already have an account? <a href="#" id="show-login">Login</a></p>
+            </div>
+        </div>
+
+        <!-- Main Section (shown when logged in) -->
+        <div id="main-section" class="section" style="display: none;">
+            <div class="header">
+                <h1>FormMate AI</h1>
+                <p>Welcome, <span id="user-email"></span></p>
+            </div>
+
+            <!-- Tabs Navigation -->
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="fill-form">Fill Form</button>
+                <button class="tab-btn" data-tab="qa-manager">Q&A Manager</button>
+                <button class="tab-btn" data-tab="profile">Profile</button>
+            </div>
+
+            <!-- Fill Form Tab -->
+            <div id="fill-form" class="tab-content active">
+                <div id="status" class="status">
+                    Checking form...
+                </div>
+                <div class="actions">
+                    <button id="fillForm" class="primary-btn" disabled>Fill Form</button>
+                    <button id="saveForm" class="secondary-btn" disabled>Save Form</button>
+                </div>
+            </div>
+
+            <!-- Q&A Manager Tab -->
+            <div id="qa-manager" class="tab-content">
+                <div class="qa-header">
+                    <input type="text" id="qa-search" placeholder="Search Q&A...">
+                    <button id="add-qa-btn" class="primary-btn">Add New</button>
+                </div>
+                <div id="qa-list" class="qa-list">
+                    <!-- Q&A items will be added here dynamically -->
+                </div>
+            </div>
+
+            <!-- Profile Tab -->
+            <div id="profile" class="tab-content">
+                <div class="profile-info">
+                    <h3>Account Settings</h3>
+                    <div class="form-group">
+                        <label for="change-password">Change Password</label>
+                        <input type="password" id="change-password" placeholder="New password">
+                    </div>
+                    <button id="update-password-btn" class="primary-btn">Update Password</button>
+                </div>
+                <button id="logout-btn" class="danger-btn">Logout</button>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Processing...</p>
+            </div>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html> 

@@ -1,157 +1,247 @@
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('Q&A Manager script loaded');
-    
-    // Use global firebase object
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+// Import Firebase initialization promise
+import { firebaseInitPromise } from './config.js';
 
-    const qaForm = document.getElementById('qaForm');
-    const qaList = document.getElementById('qaList');
-    const logoutBtn = document.getElementById('logoutBtn');
+// Wait for Firebase initialization
+let firebaseInitialized = false;
 
-    // Check authentication state
-    auth.onAuthStateChanged((user) => {
-        console.log('Auth state changed:', user ? 'User logged in' : 'No user');
-        if (user) {
-            // User is signed in
-            loadQAPairs();
-        } else {
-            // User is signed out
-            window.location.href = 'index.html';
+// Initialize Firebase
+async function initializeQA() {
+    try {
+        if (!firebaseInitialized) {
+            console.log('Waiting for Firebase initialization...');
+            await firebaseInitPromise;
+            firebaseInitialized = true;
+            console.log('Firebase initialized successfully');
         }
-    });
+        
+        // DOM Elements
+        const qaList = document.getElementById('qaList');
+        const addQaBtn = document.getElementById('addQaBtn');
+        const searchQa = document.getElementById('searchQa');
+        const qaModal = document.getElementById('qaModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const closeModal = document.getElementById('closeModal');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const qaForm = document.getElementById('qaForm');
+        const logoutBtn = document.getElementById('logoutBtn');
 
-    // Load Q&A pairs
-    function loadQAPairs() {
-        try {
-            const user = auth.currentUser;
+        let currentUserId = null;
+        let editingQaId = null;
+
+        // Check authentication state
+        firebase.auth().onAuthStateChanged((user) => {
             if (!user) {
-                console.error('No user logged in');
+                console.log('No user logged in, redirecting to login page');
+                window.location.href = 'login.html';
                 return;
             }
-
-            console.log('Loading Q&A pairs for user:', user.uid);
-            db.collection('users').doc(user.uid).collection('knowledge_base').get()
-                .then(snapshot => {
-                    qaList.innerHTML = '';
-                    
-                    if (snapshot.empty) {
-                        qaList.innerHTML = '<p class="no-data">No Q&A pairs found. Add your first pair!</p>';
-                        return;
-                    }
-
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        const qaItem = document.createElement('div');
-                        qaItem.className = 'qa-item';
-                        qaItem.innerHTML = `
-                            <div class="qa-content">
-                                <h3>${data.question}</h3>
-                                <p>${data.answer}</p>
-                            </div>
-                            <div class="qa-actions">
-                                <button onclick="editQA('${doc.id}')" class="btn-edit">Edit</button>
-                                <button onclick="deleteQA('${doc.id}')" class="btn-delete">Delete</button>
-                            </div>
-                        `;
-                        qaList.appendChild(qaItem);
-                    });
-                });
-        } catch (error) {
-            console.error('Error loading Q&A pairs:', error);
-            qaList.innerHTML = '<p class="error">Error loading Q&A pairs. Please try again.</p>';
-        }
-    }
-
-    // Add new Q&A pair
-    qaForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        
-        const question = document.getElementById('question').value.trim();
-        const answer = document.getElementById('answer').value.trim();
-        
-        if (!question || !answer) {
-            alert('Please fill in both question and answer');
-            return;
-        }
-
-        try {
-            const user = auth.currentUser;
-            if (!user) {
-                throw new Error('No user logged in');
-            }
-
-            console.log('Adding Q&A pair for user:', user.uid);
-            db.collection('users').doc(user.uid).collection('knowledge_base').add({
-                question,
-                answer,
-                createdAt: new Date()
-            });
-
-            // Clear form
-            qaForm.reset();
             
-            // Reload Q&A pairs
-            loadQAPairs();
-        } catch (error) {
-            console.error('Error adding Q&A pair:', error);
-            alert('Error adding Q&A pair. Please try again.');
-        }
-    });
+            console.log('User logged in:', user.uid);
+            currentUserId = user.uid;
+            loadQaPairs();
+        });
 
-    // Edit Q&A pair
-    window.editQA = async (qaId) => {
-        try {
-            const user = auth.currentUser;
-            if (!user) {
-                throw new Error('No user logged in');
-            }
-
-            const qaDoc = db.collection('users').doc(user.uid).collection('knowledge_base').doc(qaId);
-            const newQuestion = prompt('Enter new question:');
-            const newAnswer = prompt('Enter new answer:');
-
-            if (newQuestion && newAnswer) {
-                await qaDoc.update({
-                    question: newQuestion,
-                    answer: newAnswer,
-                    updatedAt: new Date()
+        // Load Q&A pairs
+        async function loadQaPairs(searchTerm = '') {
+            try {
+                console.log('Loading Q&A pairs for user:', currentUserId);
+                const db = firebase.firestore();
+                let qaQuery = db
+                    .collection('users')
+                    .doc(currentUserId)
+                    .collection('knowledge_base');
+                
+                // Get all documents first
+                const qaSnapshot = await qaQuery.get();
+                console.log('Query complete, documents found:', qaSnapshot.size);
+                
+                qaList.innerHTML = '';
+                
+                if (qaSnapshot.empty) {
+                    console.log('No Q&A pairs found');
+                    qaList.innerHTML = '<p class="no-qa">No Q&A pairs found</p>';
+                    return;
+                }
+                
+                // Convert to array and sort if search term exists
+                let qaArray = [];
+                qaSnapshot.forEach(doc => {
+                    const qa = doc.data();
+                    qaArray.push({ id: doc.id, ...qa });
                 });
-                loadQAPairs();
+
+                if (searchTerm) {
+                    console.log('Filtering for search term:', searchTerm);
+                    qaArray = qaArray.filter(qa => 
+                        qa.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        qa.answer.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+                }
+
+                // Sort by question
+                qaArray.sort((a, b) => a.question.localeCompare(b.question));
+                
+                // Display results
+                qaArray.forEach(qa => {
+                    console.log('Displaying Q&A:', qa);
+                    const qaItem = createQaItem(qa.id, qa);
+                    qaList.appendChild(qaItem);
+                });
+            } catch (error) {
+                console.error('Error loading Q&A pairs:', error);
+                qaList.innerHTML = `<p class="error">Error loading Q&A pairs: ${error.message}</p>`;
             }
-        } catch (error) {
-            console.error('Error editing Q&A pair:', error);
-            alert('Error editing Q&A pair. Please try again.');
         }
-    };
 
-    // Delete Q&A pair
-    window.deleteQA = async (qaId) => {
-        try {
-            const user = auth.currentUser;
-            if (!user) {
-                throw new Error('No user logged in');
+        // Create Q&A item element
+        function createQaItem(id, qa) {
+            const item = document.createElement('div');
+            item.className = 'qa-item';
+            
+            const content = document.createElement('div');
+            content.className = 'qa-content';
+            
+            const question = document.createElement('h4');
+            question.textContent = qa.question;
+            
+            const answer = document.createElement('p');
+            answer.textContent = qa.answer;
+            
+            content.appendChild(question);
+            content.appendChild(answer);
+            
+            const actions = document.createElement('div');
+            actions.className = 'qa-actions';
+            
+            const editBtn = document.createElement('button');
+            editBtn.className = 'btn btn-secondary';
+            editBtn.innerHTML = '<i class="fas fa-edit"></i>';
+            editBtn.onclick = () => editQaPair(id, qa);
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn btn-danger';
+            deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+            deleteBtn.onclick = () => deleteQaPair(id);
+            
+            actions.appendChild(editBtn);
+            actions.appendChild(deleteBtn);
+            
+            item.appendChild(content);
+            item.appendChild(actions);
+            
+            return item;
+        }
+
+        // Add new Q&A pair
+        addQaBtn.addEventListener('click', () => {
+            editingQaId = null;
+            modalTitle.textContent = 'Add Q&A Pair';
+            qaForm.reset();
+            qaModal.style.display = 'block';
+        });
+
+        // Close modal
+        function closeQaModal() {
+            qaModal.style.display = 'none';
+            qaForm.reset();
+            editingQaId = null;
+        }
+
+        closeModal.addEventListener('click', closeQaModal);
+        cancelBtn.addEventListener('click', closeQaModal);
+
+        // Handle form submission
+        qaForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const question = document.getElementById('question').value;
+            const answer = document.getElementById('answer').value;
+            
+            try {
+                const db = firebase.firestore();
+                const qaData = {
+                    question,
+                    answer,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                if (editingQaId) {
+                    // Update existing Q&A pair
+                    await db
+                        .collection('users')
+                        .doc(currentUserId)
+                        .collection('knowledge_base')
+                        .doc(editingQaId)
+                        .update(qaData);
+                } else {
+                    // Add new Q&A pair
+                    await db
+                        .collection('users')
+                        .doc(currentUserId)
+                        .collection('knowledge_base')
+                        .add(qaData);
+                }
+                
+                closeQaModal();
+                loadQaPairs(searchQa.value);
+            } catch (error) {
+                console.error('Error saving Q&A pair:', error);
             }
+        });
 
-            if (confirm('Are you sure you want to delete this Q&A pair?')) {
-                await db.collection('users').doc(user.uid).collection('knowledge_base').doc(qaId).delete();
-                loadQAPairs();
+        // Edit Q&A pair
+        function editQaPair(id, qa) {
+            editingQaId = id;
+            modalTitle.textContent = 'Edit Q&A Pair';
+            
+            document.getElementById('question').value = qa.question;
+            document.getElementById('answer').value = qa.answer;
+            
+            qaModal.style.display = 'block';
+        }
+
+        // Delete Q&A pair
+        async function deleteQaPair(id) {
+            if (!confirm('Are you sure you want to delete this Q&A pair?')) {
+                return;
             }
-        } catch (error) {
-            console.error('Error deleting Q&A pair:', error);
-            alert('Error deleting Q&A pair. Please try again.');
+            
+            try {
+                const db = firebase.firestore();
+                await db
+                    .collection('users')
+                    .doc(currentUserId)
+                    .collection('knowledge_base')
+                    .doc(id)
+                    .delete();
+                
+                loadQaPairs(searchQa.value);
+            } catch (error) {
+                console.error('Error deleting Q&A pair:', error);
+            }
         }
-    };
 
-    // Handle logout
-    logoutBtn.addEventListener('click', async () => {
-        try {
-            await auth.signOut();
-            window.location.href = 'index.html';
-        } catch (error) {
-            console.error('Error signing out:', error);
-        }
-    });
-});
+        // Search functionality
+        searchQa.addEventListener('input', (e) => {
+            loadQaPairs(e.target.value);
+        });
 
-// TODO: Integrate with Firestore for CRUD Q&A pairs 
+        // Logout handler
+        logoutBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            
+            try {
+                await firebase.auth().signOut();
+                localStorage.removeItem('user');
+                window.location.href = 'login.html';
+            } catch (error) {
+                console.error('Error signing out:', error);
+            }
+        });
+    } catch (error) {
+        console.error('Error initializing Q&A manager:', error);
+    }
+}
+
+// Initialize when the script loads
+initializeQA(); 

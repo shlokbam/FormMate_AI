@@ -2,39 +2,37 @@
   "manifest_version": 3,
   "name": "FormMate AI",
   "version": "1.0.0",
-  "description": "Your Smart Assistant to Fill, Manage & Remember Forms",
+  "description": "AI-powered form filling assistant that helps you fill out forms quickly and accurately",
   "permissions": [
-    "activeTab",
     "storage",
-    "scripting",
-    "tabs"
+    "activeTab",
+    "scripting"
   ],
   "host_permissions": [
-    "*://*.google.com/*",
     "http://localhost:5000/*"
   ],
   "action": {
-    "default_popup": "src/popup.html",
+    "default_popup": "popup.html",
     "default_icon": {
-      "16": "src/assets/icon16.png",
-      "48": "src/assets/icon48.png",
-      "128": "src/assets/icon128.png"
+      "16": "icons/placeholder.png",
+      "32": "icons/placeholder.png",
+      "48": "icons/placeholder.png",
+      "128": "icons/placeholder.png"
     }
   },
   "icons": {
-    "16": "src/assets/icon16.png",
-    "48": "src/assets/icon48.png",
-    "128": "src/assets/icon128.png"
+    "16": "icons/placeholder.png",
+    "32": "icons/placeholder.png",
+    "48": "icons/placeholder.png",
+    "128": "icons/placeholder.png"
   },
   "content_scripts": [
     {
-      "matches": ["*://*.google.com/forms/*"],
-      "js": ["src/content.js"],
-      "run_at": "document_end"
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
     }
   ],
   "background": {
-    "service_worker": "src/background.js",
-    "type": "module"
+    "service_worker": "background.js"
   }
 } 

@@ -1,6 +1,5 @@
 from flask import Blueprint, request, jsonify
 from firebase_admin import firestore
-import openai
 import os
 from datetime import datetime
 
@@ -71,32 +70,23 @@ def log_submission():
 
 def generate_ai_answers(questions, user_data):
     try:
-        openai.api_key = os.getenv('OPENAI_API_KEY')
-        
+        # Gemini API integration should be added here if needed
+        # For now, just return empty answers for unknown questions
         answers = {}
         for question in questions:
-            # Create a prompt that includes user context
-            prompt = f"""Based on the following user context and question, provide a concise and relevant answer:
-
-User Context:
-{user_data.get('context', '')}
-
-Question: {question['question']}
-
-Answer:"""
-
-            response = openai.Completion.create(
-                engine="text-davinci-003",
-                prompt=prompt,
-                max_tokens=100,
-                temperature=0.7,
-                stop=["\n"]
-            )
-
-            answers[question['fieldId']] = response.choices[0].text.strip()
-
+            answers[question['fieldId']] = "[Gemini answer placeholder]"
         return answers
-
     except Exception as e:
         print(f"Error generating AI answers: {str(e)}")
-        return {} 
+        return {}
+
+@main.route('/api/config/firebase')
+def get_firebase_config():
+    return jsonify({
+        'apiKey': os.getenv('FIREBASE_API_KEY'),
+        'authDomain': os.getenv('FIREBASE_AUTH_DOMAIN'),
+        'projectId': os.getenv('FIREBASE_PROJECT_ID'),
+        'storageBucket': os.getenv('FIREBASE_STORAGE_BUCKET'),
+        'messagingSenderId': os.getenv('FIREBASE_MESSAGING_SENDER_ID'),
+        'appId': os.getenv('FIREBASE_APP_ID')
+    }) 

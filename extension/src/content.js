@@ -1,25 +1,42 @@
 // FormMate AI Content Script
+console.log('=== FormMate AI Script Starting ===');
+
+// Add a global error handler to catch any script loading issues
+window.addEventListener('error', function(e) {
+    console.error('FormMate AI Error:', e.message, 'at', e.filename, ':', e.lineno);
+});
+
+// Add a DOMContentLoaded listener to ensure we know when the page is ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== FormMate AI: DOM Content Loaded ===');
+});
 
 class FormMate {
     constructor() {
+        console.log('=== FormMate AI: Constructor Called ===');
         this.formData = null;
         this.apiEndpoint = 'http://localhost:5000/api/process-form';
+        console.log('FormMate initialized with endpoint:', this.apiEndpoint);
         this.init();
     }
 
     async init() {
+        console.log('Initializing FormMate...');
         // Wait for the form to be fully loaded
         await this.waitForForm();
         this.formData = this.parseForm();
+        console.log('Form data parsed:', JSON.stringify(this.formData, null, 2));
         this.injectUI();
         this.setupListeners();
     }
 
     async waitForForm() {
+        console.log('Waiting for form to load...');
         return new Promise((resolve) => {
             const checkForm = () => {
                 const form = document.querySelector('form');
                 if (form) {
+                    console.log('Form found:', form);
                     resolve();
                 } else {
                     setTimeout(checkForm, 100);
@@ -29,26 +46,124 @@ class FormMate {
         });
     }
 
+    isInternalField(field) {
+        // List of Google Form's internal field names and patterns
+        const internalPatterns = [
+            'entry.',
+            'fbzx',
+            'pageHistory',
+            'token',
+            'submissionTimestamp',
+            'partialResponse',
+            'draftResponse',
+            'fvv',
+            'submitButton'
+        ];
+
+        const fieldId = field.getAttribute('name') || field.id || '';
+        console.log('Checking if field is internal:', fieldId);
+        
+        const isInternal = internalPatterns.some(pattern => {
+            const matches = fieldId.toLowerCase().includes(pattern.toLowerCase());
+            if (matches) {
+                console.log(`Field ${fieldId} matches internal pattern: ${pattern}`);
+            }
+            return matches;
+        });
+        
+        if (isInternal) {
+            console.log('Skipping internal field:', fieldId);
+        }
+        return isInternal;
+    }
+
+    getQuestionText(field) {
+        console.log('Getting question text for field:', field);
+        
+        // Skip internal fields
+        if (this.isInternalField(field)) {
+            console.log('Field is internal, skipping question text extraction');
+            return null;
+        }
+
+        // For Google Forms, the question is usually in a div with role="heading"
+        const listItem = field.closest('div[role="listitem"]');
+        if (listItem) {
+            const questionDiv = listItem.querySelector('div[role="heading"]');
+            if (questionDiv) {
+                const text = questionDiv.textContent.trim();
+                console.log('Found question in heading:', text);
+                return text;
+            }
+        }
+
+        // Try to find the question in the parent container
+        const container = field.closest('.freebirdFormviewerViewItemsItemItem');
+        if (container) {
+            const questionDiv = container.querySelector('.freebirdFormviewerViewItemsItemTitle');
+            if (questionDiv) {
+                const text = questionDiv.textContent.trim();
+                console.log('Found question in container:', text);
+                return text;
+            }
+        }
+
+        // Fallback to label
+        const label = field.closest('label') || 
+                     document.querySelector(`label[for="${field.id}"]`) ||
+                     field.previousElementSibling;
+        
+        if (label) {
+            const text = label.textContent.trim();
+            console.log('Found question in label:', text);
+            return text;
+        }
+
+        // Fallback to placeholder or name
+        const fallbackText = field.placeholder || field.name || field.id;
+        console.log('Using fallback text:', fallbackText);
+        return fallbackText;
+    }
+
     parseForm() {
+        console.log('Starting form parsing...');
         const form = document.querySelector('form');
         const questions = [];
         
         // Get all form fields
-        const fields = form.querySelectorAll('input, textarea, select');
+        const fields = form.querySelectorAll('input, textarea, select, div[role="radiogroup"], div[role="checkbox"]');
+        console.log('Found form fields:', fields.length);
         
-        fields.forEach(field => {
+        fields.forEach((field, index) => {
+            console.log(`\nProcessing field ${index + 1}:`, field);
+            
+            // Skip internal fields
+            if (this.isInternalField(field)) {
+                console.log('Skipping internal field');
+                return;
+            }
+
             const question = this.getQuestionText(field);
             const fieldId = field.getAttribute('name') || field.id;
             
             if (question && fieldId) {
+                console.log('Field details:', {
+                    question,
+                    fieldId,
+                    type: field.type || field.getAttribute('role') || field.tagName.toLowerCase()
+                });
+                
                 questions.push({
                     question,
                     fieldId,
-                    type: field.type || field.tagName.toLowerCase()
+                    type: field.type || field.getAttribute('role') || field.tagName.toLowerCase()
                 });
+            } else {
+                console.log('Skipping field - missing question or fieldId');
             }
         });
 
+        console.log('\nFinal questions to be processed:', JSON.stringify(questions, null, 2));
         return {
             url: window.location.href,
             title: document.title,
@@ -56,44 +171,38 @@ class FormMate {
         };
     }
 
-    getQuestionText(field) {
-        // Find the associated label or question text
-        const label = field.closest('.freebirdFormviewerViewItemsItemItem');
-        if (label) {
-            const questionText = label.querySelector('.freebirdFormviewerViewItemsItemItemTitle');
-            return questionText ? questionText.textContent.trim() : null;
-        }
-        return null;
-    }
-
     injectUI() {
+        console.log('Injecting UI...');
         const button = document.createElement('button');
         button.id = 'formmate-fill-button';
-        button.textContent = 'Fill with FormMate';
+        button.textContent = 'Fill Form';
         button.style.cssText = `
             position: fixed;
             bottom: 20px;
             right: 20px;
+            z-index: 10000;
             padding: 10px 20px;
-            background-color: #4CAF50;
+            background: #4CAF50;
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 4px;
             cursor: pointer;
-            z-index: 10000;
-            font-family: Arial, sans-serif;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         `;
-        
         document.body.appendChild(button);
+        console.log('UI injected');
     }
 
     setupListeners() {
+        console.log('Setting up event listeners...');
         const button = document.getElementById('formmate-fill-button');
         button.addEventListener('click', () => this.handleFill());
+        console.log('Event listeners set up');
     }
 
     async handleFill() {
+        console.log('\n=== Starting Form Fill Process ===');
         try {
             const uid = await getUIDFromChromeStorage();
             console.log('UID from Chrome storage:', uid);
@@ -101,10 +210,27 @@ class FormMate {
                 this.showError('Please log in to the FormMate AI dashboard first.');
                 return;
             }
+
+            // Filter out any remaining internal fields
+            const validQuestions = this.formData.questions.filter(q => !this.isInternalField({ getAttribute: () => q.fieldId }));
+            console.log('\nValid questions after filtering:', JSON.stringify(validQuestions, null, 2));
+
+            // Log the questions being sent
+            console.log('\nQuestions being sent to backend:', JSON.stringify(validQuestions.map(q => ({
+                question: q.question,
+                type: q.type
+            })), null, 2));
+
             const payload = {
                 uid: uid,
-                ...this.formData
+                questions: validQuestions.map(q => ({
+                    question: q.question,
+                    type: q.type
+                }))
             };
+
+            console.log('\nSending payload to backend:', JSON.stringify(payload, null, 2));
+
             const response = await fetch(this.apiEndpoint, {
                 method: 'POST',
                 headers: {
@@ -118,57 +244,101 @@ class FormMate {
             }
 
             const answers = await response.json();
+            console.log('\nReceived answers from backend:', JSON.stringify(answers, null, 2));
             this.fillForm(answers);
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Error in handleFill:', error);
             this.showError('Failed to get answers. Please try again.');
         }
     }
 
     fillForm(answers) {
-        Object.entries(answers).forEach(([fieldId, answer]) => {
-            const field = document.querySelector(`[name="${fieldId}"]`) || 
-                         document.getElementById(fieldId);
-            
-            if (field) {
-                if (field.type === 'checkbox' || field.type === 'radio') {
-                    field.checked = true;
+        console.log('\n=== Starting Form Fill ===');
+        if (!Array.isArray(answers)) {
+            console.error('Invalid answers format:', answers);
+            return;
+        }
+
+        let filledAny = false;
+        let errorMessages = [];
+
+        answers.forEach((answerObj, index) => {
+            console.log(`\nProcessing answer ${index + 1}:`, answerObj);
+
+            if (!answerObj.question) {
+                console.error('Answer object missing question:', answerObj);
+                return;
+            }
+
+            const field = this.formData.questions.find(q => q.question === answerObj.question);
+            if (!field) {
+                console.log(`No matching field found for question: ${answerObj.question}`);
+                return;
+            }
+
+            console.log('Found matching field:', field);
+
+            const element = document.querySelector(`[name="${field.fieldId}"]`) || 
+                           document.getElementById(field.fieldId);
+
+            if (!element) {
+                console.log(`No element found for field ID: ${field.fieldId}`);
+                return;
+            }
+
+            if (answerObj.error) {
+                console.log(`Error for field ${field.question}: ${answerObj.error}`);
+                errorMessages.push(`${field.question}: ${answerObj.error}`);
+            } else if (answerObj.answer) {
+                console.log(`Filling field ${field.question} with answer: ${answerObj.answer}`);
+                filledAny = true;
+                if (element.type === 'checkbox' || element.type === 'radio') {
+                    element.checked = true;
                 } else {
-                    field.value = answer;
+                    element.value = answerObj.answer;
                 }
-                
-                // Trigger change event
-                field.dispatchEvent(new Event('change', { bubbles: true }));
+                element.dispatchEvent(new Event('change', { bubbles: true }));
+                element.dispatchEvent(new Event('input', { bubbles: true }));
             }
         });
+
+        if (!filledAny) {
+            console.log('No fields were filled');
+            errorMessages.push('No answers were found in your knowledge base. Please add answers to your knowledge base first.');
+        }
+
+        if (errorMessages.length > 0) {
+            console.log('Showing error messages:', errorMessages);
+            this.showError(errorMessages.join('\n'));
+        }
     }
 
     showError(message) {
+        console.log('Showing error:', message);
         const errorDiv = document.createElement('div');
         errorDiv.style.cssText = `
             position: fixed;
             top: 20px;
             right: 20px;
-            padding: 10px 20px;
-            background-color: #f44336;
-            color: white;
-            border-radius: 5px;
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 4px;
             z-index: 10000;
-            font-family: Arial, sans-serif;
+            max-width: 300px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         `;
-        errorDiv.textContent = message;
+        errorDiv.innerHTML = `
+            <strong>FormMate AI Notice:</strong>
+            <p style="margin: 5px 0;">${message}</p>
+            <button onclick="this.parentElement.remove()" style="position: absolute; top: 5px; right: 5px; background: none; border: none; cursor: pointer; font-size: 16px;">×</button>
+        `;
         document.body.appendChild(errorDiv);
-        
-        setTimeout(() => {
-            errorDiv.remove();
-        }, 3000);
     }
 }
 
-// Initialize FormMate when the page loads
-window.addEventListener('load', () => {
-    new FormMate();
-});
+// Initialize FormMate
+new FormMate();
 
 console.log('FormMate AI content script loaded');
 
@@ -329,16 +499,63 @@ function getUIDFromChromeStorage() {
     });
 }
 
+// Add this function before fillForm()
+function normalizeQuestionText(text) {
+    if (!text) return '';
+    
+    // Remove asterisks and other special characters first
+    text = text.replace(/[*]/g, '').trim();
+    
+    // Convert to lowercase and remove remaining special characters
+    text = text.toLowerCase().trim();
+    text = text.replace(/[^a-z0-9\s]/g, '');
+    
+    // Common variations mapping with more flexible matching
+    const variations = {
+        'contact number': ['phone number', 'mobile number', 'cell number', 'telephone number', 'contact', 'phone'],
+        'name': ['full name', 'complete name', 'your name', 'fullname'],
+        'email': ['email address', 'e mail', 'e-mail'],
+        'location': ['current location', 'where are you', 'your location', 'present location', 'current place', 'where do you live', 'residence', 'address'],
+        'hometown': ['home town', 'native place', 'place of origin', 'where are you from', 'birth place', 'native city'],
+        'role': ['role applied for', 'position', 'job role', 'applied position', 'desired role', 'job title', 'applying for']
+    };
+
+    // First try exact match
+    for (const [standard, alts] of Object.entries(variations)) {
+        if (text === standard || alts.includes(text)) {
+            return standard;
+        }
+    }
+
+    // Then try partial match
+    for (const [standard, alts] of Object.entries(variations)) {
+        // Check if the text contains any of the variations
+        if (text.includes(standard) || alts.some(alt => text.includes(alt))) {
+            return standard;
+        }
+    }
+
+    // Special cases for common fields
+    if (text.includes('name')) return 'name';
+    if (text.includes('location') || text.includes('where') || text.includes('place') || text.includes('address')) return 'location';
+    if (text.includes('home') || text.includes('town') || text.includes('native')) return 'hometown';
+    if (text.includes('role') || text.includes('position') || text.includes('job')) return 'role';
+    if (text.includes('phone') || text.includes('contact') || text.includes('mobile')) return 'contact number';
+    if (text.includes('email') || text.includes('mail')) return 'email';
+
+    return text;
+}
+
 async function fillForm() {
     try {
-        alert('fillForm started');
+        console.log('fillForm started');
         const uid = await getUIDFromChromeStorage();
-        alert('UID used for request: ' + uid);
+        console.log('UID used for request:', uid);
         if (!uid) {
-            alert('Please log in to the FormMate AI dashboard first.');
+            console.error('Please log in to the FormMate AI dashboard first.');
             return;
         }
-        alert('Building payload...');
+        console.log('Building payload...');
         const payload = {
             uid: uid,
             questions: getFormFields().map(f => ({
@@ -347,50 +564,94 @@ async function fillForm() {
                 required: f.required
             }))
         };
-        alert('Payload built: ' + JSON.stringify(payload));
+        console.log('Payload built:', payload);
         const response = await fetch('http://localhost:5000/api/process-form', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        alert('Fetch sent, waiting for response...');
+        console.log('Fetch sent, waiting for response...');
         const text = await response.text();
-        alert('Raw backend response: ' + text);
+        console.log('Raw backend response:', text);
         let data;
         try {
             data = JSON.parse(text);
         } catch (parseErr) {
-            alert('Failed to parse backend response.');
             console.error('Failed to parse backend response:', text);
             return;
         }
         if (data.error) {
-            alert('Backend error: ' + data.error);
+            console.error('Backend error:', data.error);
             throw new Error(data.error);
         }
         if (!Array.isArray(data) || data.length === 0) {
-            alert('No answers received from backend.');
+            console.error('No answers received from backend.');
             return;
         }
-        // Fill the form fields by matching question text
+
+        // Get all form fields
         const fields = getFormFields();
+        console.log('Form fields found:', fields.map(f => f.question));
+
+        // Create a map of normalized questions to fields
+        const fieldMap = new Map();
+        fields.forEach(field => {
+            const normalizedQuestion = normalizeQuestionText(field.question);
+            fieldMap.set(normalizedQuestion, field);
+            console.log(`Mapped field "${field.question}" to normalized form "${normalizedQuestion}"`);
+        });
+
+        // Fill the form fields
         let filledAny = false;
+        let errorMessages = [];
+        
         data.forEach(answerObj => {
-            const field = fields.find(f => f.question.trim().toLowerCase() === answerObj.question.trim().toLowerCase());
-            if (field && answerObj.answer) {
-                filledAny = true;
-                if (field.type === 'text' || field.type === 'textarea') {
-                    field.element.value = answerObj.answer;
-                    field.element.dispatchEvent(new Event('input', { bubbles: true }));
+            const normalizedAnswerQuestion = normalizeQuestionText(answerObj.question);
+            console.log(`\nProcessing answer for question: "${answerObj.question}"`);
+            console.log(`Normalized to: "${normalizedAnswerQuestion}"`);
+
+            // Try to find matching field
+            const field = fieldMap.get(normalizedAnswerQuestion);
+            
+            if (field) {
+                if (answerObj.error) {
+                    console.log(`Error for field "${field.question}": ${answerObj.error}`);
+                    errorMessages.push(`${field.question}: ${answerObj.error}`);
+                } else if (answerObj.answer) {
+                    console.log(`Found matching field: "${field.question}"`);
+                    filledAny = true;
+                    if (field.type === 'text' || field.type === 'textarea') {
+                        field.element.value = answerObj.answer;
+                        field.element.dispatchEvent(new Event('input', { bubbles: true }));
+                        console.log(`Filled field with answer: "${answerObj.answer}"`);
+                    }
                 }
+            } else {
+                console.log(`No matching field found for "${normalizedAnswerQuestion}"`);
             }
         });
+
         if (!filledAny) {
-            alert('No matching fields were filled. Check if the questions match exactly.');
+            console.warn('No matching fields were filled. Check if the questions match exactly.');
+            errorMessages.push('No answers were found in your knowledge base. Please add answers to your knowledge base first.');
+        }
+
+        // Show error messages if any
+        if (errorMessages.length > 0) {
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #ffebee; color: #c62828; padding: 15px; border-radius: 4px; z-index: 10000; max-width: 300px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);';
+            errorDiv.innerHTML = `
+                <strong>FormMate AI Notice:</strong>
+                <ul style="margin: 5px 0; padding-left: 20px;">
+                    ${errorMessages.map(msg => `<li>${msg}</li>`).join('')}
+                </ul>
+                <p style="margin: 10px 0 0 0; font-size: 0.9em;">Please add answers to your knowledge base in the FormMate AI dashboard.</p>
+                <button onclick="this.parentElement.remove()" style="position: absolute; top: 5px; right: 5px; background: none; border: none; cursor: pointer; font-size: 16px;">×</button>
+            `;
+            document.body.appendChild(errorDiv);
         }
     } catch (err) {
-        alert('Top-level error in fillForm: ' + (err && err.message ? err.message : err));
-        console.error('Error filling form:', err);
+        console.error('Top-level error in fillForm:', err);
         throw err;
     }
 }
