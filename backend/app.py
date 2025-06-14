@@ -242,12 +242,12 @@ def validate_token(current_user):
 def get_qa_items(current_user):
     try:
         qa_ref = db.collection('users').document(current_user.id).collection('knowledge_base')
-                qa_docs = qa_ref.get()
+        qa_docs = qa_ref.get()
         
         qa_items = []
-                for doc in qa_docs:
+        for doc in qa_docs:
                     qa_data = doc.to_dict()
-            qa_items.append({
+        qa_items.append({
                 'id': doc.id,
                 'question': qa_data.get('question', ''),
                 'answer': qa_data.get('answer', '')
@@ -356,7 +356,7 @@ def change_password(current_user):
         print("Password updated and verified successfully")
         return jsonify({'message': 'Password updated successfully'})
         
-            except Exception as e:
+    except Exception as e:
         print(f"Error updating password: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
