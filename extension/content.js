@@ -1,3 +1,7 @@
+const config = {
+    BACKEND_URL: 'https://backend-deploy-psi.vercel.app'
+};
+
 // Function to extract questions from the page
 function extractQuestions() {
     const questions = [];
@@ -233,7 +237,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 console.log('Extracted questions:', questions);
                 
                 // Send questions to backend
-                const backendResponse = await fetch('http://localhost:5000/api/process-form', {
+                const backendResponse = await fetch(`${config.BACKEND_URL}/api/process-form`, {
             method: 'POST',
             headers: {
                         'Content-Type': 'application/json',

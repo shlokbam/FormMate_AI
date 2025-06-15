@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "FormMate AI",
   "version": "1.0",
-  "description": "AI-powered form filling assistant that helps you fill forms automatically using your knowledge base",
+  "description": "Save time on Google Forms! FormMate AI auto-fills forms using your personal Q&A knowledge base. Secure, fast, and easy to use.",
   "author": "FormMate AI",
   "permissions": [
     "activeTab",
@@ -10,7 +10,7 @@
     "scripting"
   ],
   "host_permissions": [
-    "http://localhost:5000/*",
+    "https://backend-deploy-psi.vercel.app/*",
     "https://docs.google.com/*"
   ],
   "content_security_policy": {
@@ -51,7 +51,6 @@
       "matches": ["https://docs.google.com/*"]
     }
   ],
-  "minimum_edge_version": "79.0.0.0",
   "browser_specific_settings": {
     "edge": {
       "browser_action_next_to_address_bar": true

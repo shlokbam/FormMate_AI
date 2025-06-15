@@ -1,3 +1,5 @@
+import config from './config.js';
+
 // DOM Elements
 const authSection = document.getElementById('auth-section');
 const mainSection = document.getElementById('main-section');
@@ -118,7 +120,7 @@ document.getElementById('login-btn').addEventListener('click', async () => {
             return;
         }
 
-        const response = await fetch('http://localhost:5000/api/login', {
+        const response = await fetch(`${config.BACKEND_URL}/api/login`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
@@ -168,7 +170,7 @@ document.getElementById('register-btn').addEventListener('click', async () => {
             return;
         }
 
-        const response = await fetch('http://localhost:5000/api/register', {
+        const response = await fetch(`${config.BACKEND_URL}/api/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
@@ -247,7 +249,7 @@ async function loadQAs() {
         }
 
         console.log('Loading Q&A items...');
-        const response = await fetch('http://localhost:5000/api/qa', {
+        const response = await fetch(`${config.BACKEND_URL}/api/qa`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Accept': 'application/json'
@@ -337,7 +339,7 @@ function createQAElement(item) {
             try {
                 showLoading();
                 const token = await getStoredToken();
-                const response = await fetch(`http://localhost:5000/api/qa/${item.id}`, {
+                const response = await fetch(`${config.BACKEND_URL}/api/qa/${item.id}`, {
                     method: 'DELETE',
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -387,7 +389,7 @@ addQaBtn.addEventListener('click', async () => {
         let response;
         if (addQaBtn.dataset.mode === 'edit') {
             // Update existing Q&A
-            response = await fetch(`http://localhost:5000/api/qa/${qaId}`, {
+            response = await fetch(`${config.BACKEND_URL}/api/qa/${qaId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -397,7 +399,7 @@ addQaBtn.addEventListener('click', async () => {
             });
         } else {
             // Add new Q&A
-            response = await fetch('http://localhost:5000/api/qa', {
+            response = await fetch(`${config.BACKEND_URL}/api/qa`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -456,7 +458,7 @@ updatePasswordBtn.addEventListener('click', async () => {
             return;
         }
 
-        const response = await fetch('http://localhost:5000/api/change-password', {
+        const response = await fetch(`${config.BACKEND_URL}/api/change-password`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -568,7 +570,7 @@ async function removeStoredToken() {
 
 async function validateToken(token) {
     try {
-        const response = await fetch('http://localhost:5000/api/validate-token', {
+        const response = await fetch(`${config.BACKEND_URL}/api/validate-token`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }

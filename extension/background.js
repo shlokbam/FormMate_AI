@@ -1,3 +1,5 @@
+import config from './config.js';
+
 // Listen for installation
 chrome.runtime.onInstalled.addListener(() => {
     // Initialize default settings
@@ -77,7 +79,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         const newToken = changes.token.newValue;
         if (newToken) {
             // Validate token with backend
-            fetch('http://localhost:5000/api/validate-token', {
+            fetch(`${config.BACKEND_URL}/api/validate-token`, {
                 headers: {
                     'Authorization': `Bearer ${newToken}`
                 }
