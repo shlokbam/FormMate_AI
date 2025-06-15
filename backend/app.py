@@ -27,7 +27,19 @@ print("GEMINI_API_KEY:", "Present" if os.getenv('GEMINI_API_KEY') else "Missing"
 print("\n")
 
 app = Flask(__name__)
-CORS(app)
+# Configure CORS for Edge extension
+CORS(app, resources={
+    r"/api/*": {
+        "origins": [
+            "chrome-extension://*",  # Chrome extensions
+            "edge-extension://*",    # Edge extensions
+            "moz-extension://*"      # Firefox extensions
+        ],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
+    }
+})
 
 # JWT Configuration
 JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key')  # Change this in production
@@ -246,8 +258,8 @@ def get_qa_items(current_user):
         
         qa_items = []
         for doc in qa_docs:
-                    qa_data = doc.to_dict()
-        qa_items.append({
+            qa_data = doc.to_dict()
+            qa_items.append({
                 'id': doc.id,
                 'question': qa_data.get('question', ''),
                 'answer': qa_data.get('answer', '')
