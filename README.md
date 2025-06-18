@@ -10,6 +10,12 @@ FormMate AI is a Chrome extension that helps you automatically fill out Google F
 - **Secure Authentication**: Firebase Authentication for secure user management
 - **Profile Management**: Change password and manage your account settings
 
+## Extension & Legal
+
+- **Extension on Chrome Web Store**: [FormMate AI - Chrome Extension](https://chromewebstore.google.com/detail/pdkfcjpmfhoecmipgadlagbmammoocll?utm_source=item-share-cb)  
+- **Privacy Policy**: [Read our Privacy Policy](https://shlokbam.github.io/FormMate_AI-Privacy-Policy/)
+- **Deployed Backend**: [Backend](backend-deploy-psi.vercel.app)
+
 ## Project Structure
 
 ```
